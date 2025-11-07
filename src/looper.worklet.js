@@ -1,62 +1,59 @@
-// A simple 2-second circular looper.
-// - Press & hold 'record' param => writes mic into a 2s circular buffer.
-// - Release => keeps looping playback of that 2s buffer.
-// - Next hold => clears/overwrites from the start.
-
+// in looper.worklet.js
 class TwoSecondLooper extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [
-      {name: 'record', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
+      { name: 'record', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'a-rate' }, // <-- a-rate now
     ];
   }
-
-  constructor(_options) {
+  constructor() {
     super();
-    this.sampleRate_ = sampleRate;                // audio render thread sample rate
-    this.len = Math.floor(this.sampleRate_ * 2); // 2 seconds
+    this.sr = sampleRate;
+    this.len = Math.floor(this.sr * 2);
     this.buf = new Float32Array(this.len);
     this.writeIdx = 0;
     this.readIdx = 0;
-
-    this.wasRecording = 0;  // for edge detection
+    this.wasRecording = 0;           // last sample's state
   }
-
   clearBuffer() {
     this.buf.fill(0);
     this.writeIdx = 0;
     this.readIdx = 0;
   }
-
   process(inputs, outputs, parameters) {
-    const input = inputs[0] && inputs[0][0] ? inputs[0][0] : null; // mono
-    const outputL = outputs[0][0];
-    const outputR = outputs[0][1];
+    const input  = inputs[0]?.[0];
+    const output = outputs[0][0];
+    const recArr = parameters.record;                 // a-rate array (length N or 1)
+    const N = output.length;
 
-    // k-rate param => one value per block
-    const rec = parameters.record[0];
+    let w = this.writeIdx;
+    let r = this.readIdx;
+    let prev = this.wasRecording;
 
-    // rising edge: start a *fresh* recording (overwrite)
-    if (this.wasRecording < 0.5 && rec >= 0.5) {
-      this.clearBuffer();
-    }
-    this.wasRecording = rec;
-
-    const N = outputR.length;
     for (let i = 0; i < N; i++) {
-      if (rec >= 0.5 && input) {
-        this.buf[this.writeIdx] = input[i];
-        this.writeIdx++;
-        if (this.writeIdx >= this.len) this.writeIdx = 0;
-      } else {
-          outputL[i] = this.buf[this.readIdx];
-          outputR[i] = this.buf[this.readIdx];
+      const rec = (recArr.length > 1 ? recArr[i] : recArr[0]) >= 0.5 ? 1 : 0;
+
+      // rising edge → fresh take
+      if (!prev && rec) {
+        this.clearBuffer();
+        w = this.writeIdx; r = this.readIdx;
       }
-      this.readIdx++;
-      if (this.readIdx >= this.len) this.readIdx = 0;
+      prev = rec;
+
+      // record if on
+      if (rec && input) {
+        this.buf[w] = input[i];
+        if (++w === this.len) w = 0;
+      }
+
+      // always play loop
+      output[i] = this.buf[r];
+      if (++r === this.len) r = 0;
     }
 
+    this.writeIdx = w;
+    this.readIdx = r;
+    this.wasRecording = prev;
     return true;
   }
 }
-
 registerProcessor('two-second-looper', TwoSecondLooper);

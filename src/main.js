@@ -7,6 +7,7 @@ async function ensureAudio() {
   ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
 
   await ac.audioWorklet.addModule('/src/noise-gate.worklet.js');
+  await ac.audioWorklet.addModule('/src/onset-detector.worklet.js');
   await ac.audioWorklet.addModule('/src/looper.worklet.js');
 
   // Ask for mono mic
@@ -29,8 +30,21 @@ async function ensureAudio() {
   });
   looper = new AudioWorkletNode(ac, 'two-second-looper');
 
-  // route: mic -> looper -> speakers
-  src.connect(noiseGate).connect(looper).connect(ac.destination);
+  const onsetDetector = new AudioWorkletNode(ac, 'onset-detector', {
+    parameterData: { sensitivity: 11, floor: -60, holdMs: 2000, cooldownMs: 80, attackMs: 5, releaseMs: 30 }
+  });
+
+  // main route -> input through looper
+  src
+    .connect(noiseGate)
+    .connect(looper)
+    .connect(ac.destination);
+
+  // feed the input also to the onset detector
+  noiseGate.connect(onsetDetector);
+
+  // let the onset detector tell the looper when to start recording
+  onsetDetector.connect(looper.parameters.get('record'));
 }
 
 function setRecording(isOn) {
