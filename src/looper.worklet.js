@@ -8,7 +8,7 @@ class TwoSecondLooper extends AudioWorkletProcessor {
   constructor() {
     super();
     this.sr = sampleRate;
-    this.len = Math.floor(this.sr * 2);
+    this.len = Math.floor(this.sr);
     this.buf = new Float32Array(this.len);
     this.writeIdx = 0;
     this.readIdx = 0;
