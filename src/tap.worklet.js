@@ -1,5 +1,5 @@
 // Audio in -> (optional passthrough) -> out
-// Also batches N samples and posts them to the main thread.
+// Batches N samples and posts them to the main thread.
 class TapNode extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [
@@ -25,13 +25,13 @@ class TapNode extends AudioWorkletProcessor {
     // pass-through (cheap)
     if (doPass) output.set(input); else output.fill(0);
 
-    // collect samples (optionally downsample)
     for (let i = 0; i < input.length; i += this.downsample) {
+      // collect samples into buffer
       this.buf[this.w++] = input[i];
+      // post message when full
       if (this.w === this.buf.length) {
-        // transfer the chunk out; hand off ownership to avoid copies
         this.port.postMessage({ audio: this.buf }, [this.buf.buffer]);
-        this.buf = new Float32Array(this.blockSize); // new backing store for next batch
+        this.buf = new Float32Array(this.blockSize);
         this.w = 0;
       }
     }

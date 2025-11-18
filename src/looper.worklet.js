@@ -1,5 +1,6 @@
 // in looper.worklet.js
-class TwoSecondLooper extends AudioWorkletProcessor {
+
+class Looper extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [
       { name: 'record', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'a-rate' }, // <-- a-rate now
@@ -19,10 +20,12 @@ class TwoSecondLooper extends AudioWorkletProcessor {
     this.writeIdx = 0;
     this.readIdx = 0;
   }
+
+
   process(inputs, outputs, parameters) {
     const input  = inputs[0]?.[0];
     const output = outputs[0][0];
-    const recArr = parameters.record;                 // a-rate array (length N or 1)
+    const recArr = parameters.record;
     const N = output.length;
 
     let w = this.writeIdx;
@@ -36,6 +39,11 @@ class TwoSecondLooper extends AudioWorkletProcessor {
       if (!prev && rec) {
         this.clearBuffer();
         w = this.writeIdx; r = this.readIdx;
+      }
+
+      // lowering edge -> classify
+      if ( prev && !rec) {
+        this.port.postMessage({ type: 'msg', msg: 'looper stopping recording' });
       }
       prev = rec;
 
@@ -56,4 +64,4 @@ class TwoSecondLooper extends AudioWorkletProcessor {
     return true;
   }
 }
-registerProcessor('two-second-looper', TwoSecondLooper);
+registerProcessor('looper', Looper);
