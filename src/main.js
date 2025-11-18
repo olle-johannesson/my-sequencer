@@ -9,8 +9,18 @@ const log = e => logType.get(e?.data?.type)?.(`${e?.data?.from}:`, e?.data?.mess
 
 // init worker threads
 const fluxWorker = new Worker(new URL('./flux.worker.js', import.meta.url), {type: 'module'});
-fluxWorker.onmessage = log
 fluxWorker.onerror = (e) => console.error('flux worker error', e);
+// fluxWorker.onmessage = log
+
+const postProcessWorker = new Worker(new URL('./postprocess.worker.js', import.meta.url), {type: 'module'});
+postProcessWorker.onerror = (e) => console.error('post-process Worker error', e);
+postProcessWorker.onmessage = (e) => {
+  if (e.data.type === 'processedRecording') {
+    let sample = audioBufferFromSAB(audioContext, e.data.samples);
+    pattern[currentStep].push(sample);
+    pattern[Math.floor(Math.random() * pattern.length)].push(sample);
+  }
+}
 
 // shared buffers
 const fluxMailboxSAB = new SharedArrayBuffer(8); // [Float32 payload][Int32 seq]
@@ -156,7 +166,7 @@ async function setupLoop() {
   ])
 
   pattern = [
-    [],
+    [closedHiHat],
     [],
     [],
     [],
@@ -166,7 +176,7 @@ async function setupLoop() {
     [],
     [],
 
-    [],
+    [closedHiHat],
     [],
     [],
     [],
@@ -210,8 +220,10 @@ async function setupLoop() {
       let raw = e.data.audio
       // let normalized = normalizeRMS(raw, -20, -1);
       // console.log(normalized.slice(0, 100));
-      let sample = audioBufferFromSAB(audioContext, raw);
-      pattern[0][0] = sample
+      postProcessWorker.postMessage({
+        type: 'processRecording',
+        samples: e.data.audio,
+        sampleRate: audioContext.sampleRate });
       // pattern[3][0] = sample
     }
   }
