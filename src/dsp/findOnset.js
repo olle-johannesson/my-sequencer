@@ -14,8 +14,6 @@ export function findOnset(Meyda, samples, sampleRate) {
   }
 
   if (fluxes.length === 0) return 0;
-
-  // Simple threshold: first frame above some fraction of maxFlux
   const threshold = maxFlux * 0.3; // tweakable (0.2–0.4 ish)
 
   let onsetFrame = 0;

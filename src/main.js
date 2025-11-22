@@ -8,8 +8,8 @@ import {FEATURE_COUNT} from "./util/mailbox.js";
 const btn = document.getElementById('hold');
 
 // init worker threads
-const fluxWorker = new Worker(new URL('./workers/flux.worker.js', import.meta.url), {type: 'module'});
-fluxWorker.onerror = (e) => console.error('flux worker error', e);
+const analysisWorker = new Worker(new URL('./workers/analysis.worker.js', import.meta.url), {type: 'module'});
+analysisWorker.onerror = (e) => console.error('analysis worker error', e);
 
 const postProcessWorker = new Worker(new URL('./workers/postprocess.worker.js', import.meta.url), {type: 'module'});
 postProcessWorker.onerror = (e) => console.error('post-process Worker error', e);
@@ -61,7 +61,7 @@ async function setupLoop() {
 
   microphoneInput = new MediaStreamAudioSourceNode(audioContext, {mediaStream: stream});
 
-  fluxWorker.postMessage({type: 'init', mailboxSAB: fluxMailboxSAB, sampleRate: audioContext.sampleRate});
+  analysisWorker.postMessage({type: 'init', mailboxSAB: fluxMailboxSAB, sampleRate: audioContext.sampleRate});
 
   const gate = new AudioWorkletNode(audioContext, 'noise-gate', {
     parameterData: { threshold: [-50], ratio: 6, mix: 1 }
@@ -83,7 +83,7 @@ async function setupLoop() {
 
   tap.port.onmessage = (e) => {
     const chunk = new Float32Array(e.data.audio);
-    fluxWorker.postMessage({ type: 'data', audio: chunk }, [chunk.buffer]);
+    analysisWorker.postMessage({ type: 'data', audio: chunk }, [chunk.buffer]);
   };
 
   const fluxParam = new AudioWorkletNode(audioContext, 'param-source', {
