@@ -4,9 +4,21 @@ let previousBlock
 let mb
 let rmsThreshold = 1e-3
 
+/**
+ * It is important to write the value to mailbox before incrementing the sequence counter.
+ * Otherwise, the value may be read by the main thread before the sequence counter is incremented.
+ * The sequence counter is used like a flag to indicate that the mailbox has been updated.
+ * That's why the consumer reads it like this:
+ *
+ *    if (s !== this.seq) {
+ *       this.value = this.mb.f32[0];
+ *       this.seq = s;
+ *     }
+ * @param v
+ */
 function publishGate(v /* 0..1 */) {
-  mb.f32[0] = v                                             // payload first
-  Atomics.store(mb.i32, 0, (Atomics.load(mb.i32, 0) + 1) | 0) // then seq
+  mb.f32[0] = v
+  Atomics.store(mb.i32, 0, (Atomics.load(mb.i32, 0) + 1) | 0)
 }
 
 onmessage = async (e) => {
