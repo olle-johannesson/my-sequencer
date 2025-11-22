@@ -1,4 +1,5 @@
 import Meyda from "meyda"
+import {createMailboxViews} from "../util/mailbox.js";
 
 let previousBlock
 let mb
@@ -16,20 +17,11 @@ let rmsThreshold = 1e-3
  *     }
  * @param v
  */
-function publishGate(v /* 0..1 */) {
-  mb.f32[0] = v
-  Atomics.store(mb.i32, 0, (Atomics.load(mb.i32, 0) + 1) | 0)
-}
-
 onmessage = async (e) => {
   const {data} = e
   switch (data?.type) {
     case 'init': {
-      mb = {
-        f32: new Float32Array(data.mailboxSAB, 0, 1),
-        i32: new Int32Array(data.mailboxSAB, 4, 1),
-      }
-
+      mb = createMailboxViews(data.mailboxSAB)
       self.postMessage({type: 'ack'})
       break
     }
@@ -37,10 +29,29 @@ onmessage = async (e) => {
     case ('data'): {
       const block = data.audio
       if (!previousBlock) { previousBlock = block }
-      let { spectralFlux, rms } = Meyda.extract(["spectralFlux", "rms"], block, previousBlock);
-      let isNovel = spectralFlux > 0 && rms > rmsThreshold
-      publishGate(Number(isNovel))
+      let {
+        spectralFlux,
+        rms,
+        spectralCentroid,
+        spectralFlatness
+      } = Meyda.extract([
+        'spectralFlux',
+        'rms',
+        'spectralCentroid',
+        'spectralFlatness'],
+        block,
+        previousBlock
+      );
+
+      mb.f32[0] = spectralFlux;
+      mb.f32[1] = rms || 0;
+      mb.f32[2] = spectralCentroid || 0;
+      mb.f32[3] = spectralFlatness || 0;
+      const nextSeq = (Atomics.load(mb.i32, 0) + 1) | 0
+
+      Atomics.store(mb.i32, 0, nextSeq)
       previousBlock = block;
+      break;
     }
   }
 }

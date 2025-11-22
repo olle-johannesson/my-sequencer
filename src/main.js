@@ -2,6 +2,7 @@ import {createMeter} from "./meter.js";
 import {nextStepTime, pattern, currentStep, scheduler, addSample} from "./looper.js";
 import {audioBufferFromSAB} from "./dsp/audioBufferFromFloatArray.js";
 import {loadLN2} from "./sampleBank.js";
+import {FEATURE_COUNT} from "./util/mailbox.js";
 
 // buttons
 const btn = document.getElementById('hold');
@@ -19,7 +20,9 @@ postProcessWorker.onmessage = (e) => {
 }
 
 // shared buffers
-const fluxMailboxSAB = new SharedArrayBuffer(8);
+const fluxMailboxSAB = new SharedArrayBuffer(
+  Int32Array.BYTES_PER_ELEMENT + FEATURE_COUNT * Float32Array.BYTES_PER_ELEMENT
+);
 
 // audio setup
 let audioContext, stream, microphoneInput, recorder;
@@ -84,7 +87,17 @@ async function setupLoop() {
   };
 
   const fluxParam = new AudioWorkletNode(audioContext, 'param-source', {
-    processorOptions: { mailboxSAB: fluxMailboxSAB },
+    numberOfInputs: 0,
+    numberOfOutputs: 3,
+    outputChannelCount: [
+      1, // novelty/flux (recording flag): 0 or 1
+      1, // HPF Frequency: in Hz
+      1  // Auto Gain: linear 0.25–4.0
+    ],
+    processorOptions: {
+      mailboxSAB: fluxMailboxSAB,
+      featureCount: FEATURE_COUNT
+    },
   });
 
   const delay = audioContext.createDelay(1.0);
@@ -113,10 +126,13 @@ async function setupLoop() {
     .connect(recordGain)
     .connect(recorder)
 
+  // connect analysis params to filter chain and record nodes
   const recordParam = recorder.parameters.get('record');
   recordParam.cancelScheduledValues(0);
   recordParam.value = 0;  // 👈 crucial
-  fluxParam.connect(recordParam);
+  fluxParam.connect(recordParam, 0);
+  fluxParam.connect(hp.frequency, 1);
+  fluxParam.connect(recordGain.gain, 2);
 
 
 

@@ -1,31 +1,73 @@
 // src/param-source.worklet.js
+import {createMailboxViews} from "../util/mailbox.js";
+import {gainFromRms, hpfFreqFromCentroid} from "../dsp/featureConversion.js";
+
 class ParamSource extends AudioWorkletProcessor {
   static get parameterDescriptors() {
-    return [{ name: 'attackMs', defaultValue: 5 }, { name: 'releaseMs', defaultValue: 30 }];
+    return [{
+      name: 'attackMs',
+      defaultValue: 5
+    }, {
+      name: 'releaseMs',
+      defaultValue: 30
+    }];
   }
   constructor({ processorOptions }) {
     super();
-    this.mb = {
-      f32: new Float32Array(processorOptions.mailboxSAB, 0, 1),
-      i32: new Int32Array(processorOptions.mailboxSAB, 4, 1),
-    }
-    this.seq = -1;
-    this.target = 0;
+    this.mb = createMailboxViews(processorOptions.mailboxSAB);
+    this.lastSeq = -1;
     this.value = 0;
+    this.rmsThreshold = processorOptions.rmsThreshold ?? 1e-3
+    this.features = {
+      novelty: 0,
+      rms: 0,
+      centroidHz: 0,
+      flatness: 0 };
+    this.smoothed = {
+      gate: 0,
+      hpFreq: 100,
+      gain: 1
+    };
   }
+
+  isNovel(flux, rms) {
+    return (rms > this.rmsThreshold) && (flux > 0.05);
+  }
+
+  updateFeaturesIfNeeded() {
+    const currentSeq = Atomics.load(this.mb.i32, 0);
+    if (currentSeq === this.lastSeq) {
+      return;
+    }
+    this.lastSeq = currentSeq;
+    const f = this.mb.f32;
+
+    this.features.novelty = this.isNovel(f[0], f[1]);
+    this.features.rms = f[1];
+    this.features.centroidHz = f[2];
+    this.features.flatness = f[3];
+  }
+
   process(inputs, outputs, params) {
-    const output = outputs[0][0];
-    const s = Atomics.load(this.mb.i32, 0);
+    const [gateOut, hpOut, gainOut] = outputs;
+    this.updateFeaturesIfNeeded();
 
-    if (s !== this.seq) {
-      this.value = this.mb.f32[0];
-      this.seq = s;
-      // this.port.postMessage(`v: ${this.mb.f32[0]}, s: ${s}, seq: ${this.seq}`);
+    const targetGate = this.features.novelty;
+    this.smoothed.gate += 0.1 * (targetGate - this.smoothed.gate);
+
+    const targetHp = hpfFreqFromCentroid(this.features.centroidHz, { flatness: this.features.flatness })
+    this.smoothed.hpFreq += 0.05 * (targetHp - this.smoothed.hpFreq);
+
+    const rawGain = gainFromRms(this.features.rms);
+    this.smoothed.gain += 0.05 * (rawGain - this.smoothed.gain);
+
+    const len = gateOut[0].length;
+    for (let i = 0; i < len; i++) {
+      gateOut[0][i] = this.smoothed.gate;
+      hpOut[0][i]   = this.smoothed.hpFreq;
+      gainOut[0][i] = this.smoothed.gain;
     }
 
-    for (let i= 0; i < output.length ; i++) {
-      output[i] = this.value
-    }
     return true;
   }
 }
