@@ -2,7 +2,7 @@
 import {createMailboxViews} from "../util/mailbox.js";
 import {gainFromRms, hpfFreqFromCentroid} from "../dsp/featureConversion.js";
 
-class ParamSource extends AudioWorkletProcessor {
+class AnalysisReader extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [{
       name: 'attackMs',
@@ -66,4 +66,4 @@ class ParamSource extends AudioWorkletProcessor {
     return true;
   }
 }
-registerProcessor('param-source', ParamSource);
+registerProcessor('analysis-reader', AnalysisReader);

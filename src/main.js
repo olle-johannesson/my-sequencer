@@ -1,5 +1,5 @@
 import {createMeter} from "./meter.js";
-import {nextStepTime, pattern, currentStep, scheduler, addSample} from "./looper.js";
+import {currentStep, scheduler, addSample} from "./looper.js";
 import {audioBufferFromSAB} from "./dsp/audioBufferFromFloatArray.js";
 import {loadLN2} from "./sampleBank.js";
 import {FEATURE_COUNT} from "./util/mailbox.js";
@@ -47,7 +47,7 @@ async function setupLoop() {
 
   await audioContext.audioWorklet.addModule('/src/worklets/noise-gate.worklet.js');
   await audioContext.audioWorklet.addModule('/src/worklets/tap.worklet.js');
-  await audioContext.audioWorklet.addModule('/src/worklets/param-source.worklet.js');
+  await audioContext.audioWorklet.addModule('/src/worklets/analysis-reader.worklet.js');
   await audioContext.audioWorklet.addModule('/src/worklets/recorder.worklet.js');
 
   stream = await navigator.mediaDevices.getUserMedia({
@@ -86,7 +86,7 @@ async function setupLoop() {
     analysisWorker.postMessage({ type: 'data', audio: chunk }, [chunk.buffer]);
   };
 
-  const fluxParam = new AudioWorkletNode(audioContext, 'param-source', {
+  const analysisReader = new AudioWorkletNode(audioContext, 'analysis-reader', {
     numberOfInputs: 0,
     numberOfOutputs: 3,
     outputChannelCount: [
@@ -130,9 +130,9 @@ async function setupLoop() {
   const recordParam = recorder.parameters.get('record');
   recordParam.cancelScheduledValues(0);
   recordParam.value = 0;  // 👈 crucial
-  fluxParam.connect(recordParam, 0);
-  fluxParam.connect(hp.frequency, 1);
-  fluxParam.connect(recordGain.gain, 2);
+  analysisReader.connect(recordParam, 0);
+  analysisReader.connect(hp.frequency, 1);
+  analysisReader.connect(recordGain.gain, 2);
 
 
 
