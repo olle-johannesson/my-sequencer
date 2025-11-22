@@ -30,10 +30,6 @@ class ParamSource extends AudioWorkletProcessor {
     };
   }
 
-  isNovel(flux, rms) {
-    return (rms > this.rmsThreshold) && (flux > 0.05);
-  }
-
   updateFeaturesIfNeeded() {
     const currentSeq = Atomics.load(this.mb.i32, 0);
     if (currentSeq === this.lastSeq) {
@@ -42,7 +38,7 @@ class ParamSource extends AudioWorkletProcessor {
     this.lastSeq = currentSeq;
     const f = this.mb.f32;
 
-    this.features.novelty = this.isNovel(f[0], f[1]);
+    this.features.novelty = f[0];
     this.features.rms = f[1];
     this.features.centroidHz = f[2];
     this.features.flatness = f[3];
@@ -52,8 +48,7 @@ class ParamSource extends AudioWorkletProcessor {
     const [gateOut, hpOut, gainOut] = outputs;
     this.updateFeaturesIfNeeded();
 
-    const targetGate = this.features.novelty;
-    this.smoothed.gate += 0.1 * (targetGate - this.smoothed.gate);
+    this.smoothed.gate += 0.1 * ( this.features.novelty - this.smoothed.gate);
 
     const targetHp = hpfFreqFromCentroid(this.features.centroidHz, { flatness: this.features.flatness })
     this.smoothed.hpFreq += 0.05 * (targetHp - this.smoothed.hpFreq);

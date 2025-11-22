@@ -5,6 +5,10 @@ let previousBlock
 let mb
 let rmsThreshold = 1e-3
 
+function isNovel(flux, rms) {
+  return (rms > rmsThreshold) && (flux > 0.05);
+}
+
 /**
  * It is important to write the value to mailbox before incrementing the sequence counter.
  * Otherwise, the value may be read by the main thread before the sequence counter is incremented.
@@ -43,7 +47,7 @@ onmessage = async (e) => {
         previousBlock
       );
 
-      mb.f32[0] = spectralFlux;
+      mb.f32[0] = isNovel(spectralFlux, rms);
       mb.f32[1] = rms || 0;
       mb.f32[2] = spectralCentroid || 0;
       mb.f32[3] = spectralFlatness || 0;
