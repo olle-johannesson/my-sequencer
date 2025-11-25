@@ -1,5 +1,5 @@
 // src/param-source.worklet.js
-import {createMailboxViews} from "../util/mailbox.js";
+import {createFeatureMailboxViews} from "../util/mailbox.js";
 import {gainFromRms, hpfFreqFromCentroid} from "../dsp/featureConversion.js";
 
 class AnalysisReader extends AudioWorkletProcessor {
@@ -14,7 +14,7 @@ class AnalysisReader extends AudioWorkletProcessor {
   }
   constructor({ processorOptions }) {
     super();
-    this.mb = createMailboxViews(processorOptions.mailboxSAB);
+    this.mb = createFeatureMailboxViews(processorOptions.mailboxSAB);
     this.lastSeq = -1;
     this.value = 0;
     this.rmsThreshold = processorOptions.rmsThreshold ?? 1e-3

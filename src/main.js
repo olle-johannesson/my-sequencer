@@ -18,10 +18,16 @@ postProcessWorker.onmessage = (e) => {
   addSample(Math.floor(currentStep), sample);
   addSample(Math.floor(Math.random() * 16), sample);
 }
+const analysisBlockSize = 1024
+const spectrumSize = analysisBlockSize / 2
 
 // shared buffers
-const fluxMailboxSAB = new SharedArrayBuffer(
+const audioFeatureSAB = new SharedArrayBuffer(
   Int32Array.BYTES_PER_ELEMENT + FEATURE_COUNT * Float32Array.BYTES_PER_ELEMENT
+);
+
+const noiseSpectrumSAB = new SharedArrayBuffer(
+  Int32Array.BYTES_PER_ELEMENT + spectrumSize * Float32Array.BYTES_PER_ELEMENT
 );
 
 // audio setup
@@ -39,10 +45,15 @@ async function ensureAudio() {
 async function setupLoop() {
   const LM2 = await loadLN2(audioContext);
   addSample(0, LM2.kick)
-  addSample(8, LM2.kick)
-  addSample(10, LM2.kick)
+  addSample(0, LM2.closedHiHat)
   addSample(4, LM2.snare)
+  addSample(4, LM2.closedHiHat)
+  addSample(7, LM2.kick)
+  addSample(8, LM2.kick)
+  addSample(8, LM2.closedHiHat)
+  addSample(10, LM2.kick)
   addSample(12, LM2.snare)
+  addSample(12, LM2.closedHiHat)
   scheduler(audioContext)
 
   await audioContext.audioWorklet.addModule('/src/worklets/noise-gate.worklet.js');
@@ -54,14 +65,27 @@ async function setupLoop() {
     audio: {
       channelCount: 1,
       echoCancellation: true,
-      noiseSuppression: true,
+      noiseSuppression: false,
       autoGainControl: false,
     }
   });
 
   microphoneInput = new MediaStreamAudioSourceNode(audioContext, {mediaStream: stream});
 
-  analysisWorker.postMessage({type: 'init', mailboxSAB: fluxMailboxSAB, sampleRate: audioContext.sampleRate});
+  analysisWorker.postMessage({
+    type: 'init',
+    featureMailboxSAB: audioFeatureSAB,
+    noiseMailboxSAB: noiseSpectrumSAB,
+    sampleRate: audioContext.sampleRate,
+    spectrumSize
+  });
+
+  postProcessWorker.postMessage({
+    type: 'init',
+    noiseMailboxSAB: noiseSpectrumSAB,
+    sampleRate: audioContext.sampleRate,
+    spectrumSize
+  });
 
   const gate = new AudioWorkletNode(audioContext, 'noise-gate', {
     parameterData: { threshold: [-50], ratio: 6, mix: 1 }
@@ -77,7 +101,7 @@ async function setupLoop() {
   }
 
   const tap = new AudioWorkletNode(audioContext, 'tap-node', {
-    processorOptions: { blockSize: 1024, downsample: 3 },
+    processorOptions: { blockSize: analysisBlockSize, downsample: 1 },
     parameterData: { passthrough: 1 }
   });
 
@@ -95,7 +119,7 @@ async function setupLoop() {
       1  // Auto Gain: linear 0.25–4.0
     ],
     processorOptions: {
-      mailboxSAB: fluxMailboxSAB,
+      mailboxSAB: audioFeatureSAB,
       featureCount: FEATURE_COUNT
     },
   });
@@ -118,7 +142,7 @@ async function setupLoop() {
   recordGain.gain.value = 0.8;
 
   microphoneInput
-    .connect(gate)
+    // .connect(gate)
     .connect(tap) // tap in to the signal to forward it to the web worker
     .connect(delay)
     .connect(hp)
@@ -143,7 +167,7 @@ async function setupLoop() {
     label: 'Flux Gate',
     map: 'linear'
   });
-  fluxMeter.bindMailbox(fluxMailboxSAB);
+  fluxMeter.bindMailbox(audioFeatureSAB);
 
   // noise gate output
   const analyser = new AnalyserNode(audioContext, {fftSize: 1024});

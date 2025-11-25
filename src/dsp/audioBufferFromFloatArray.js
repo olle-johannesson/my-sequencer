@@ -5,6 +5,8 @@ export function audioBufferFromSAB(audioContext, sab, options = {}) {
     interleaved = false, // set true if SAB is LRLRLR...
   } = options;
 
+  if (!sab || sab.byteLength === 0) { return audioContext.createBuffer(1, 1, sampleRate) }
+
   const sabView = new Float32Array(sab);
   const length = sabView.length / (interleaved ? channels : 1);
   const buffer = audioContext.createBuffer(channels, length, sampleRate);
