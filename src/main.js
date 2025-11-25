@@ -1,7 +1,6 @@
-import {createMeter} from "./meter.js";
-import {currentStep, scheduler, addSample} from "./looper.js";
+import {addDrumSample, addSample, currentStep, scheduler} from "./looper.js";
 import {audioBufferFromSAB} from "./dsp/audioBufferFromFloatArray.js";
-import {loadKawaii, loadLN2} from "./sampleBank.js";
+import {loadLN2} from "./sampleBank.js";
 import {FEATURE_COUNT} from "./util/mailbox.js";
 import {DRUM_MAP, initMagenta, makePattern} from "./pattern.js";
 
@@ -17,7 +16,7 @@ const postProcessWorker = new Worker(new URL('./workers/postprocess.worker.js', 
 postProcessWorker.onerror = (e) => console.error('post-process Worker error', e);
 postProcessWorker.onmessage = (e) => {
   let sample = audioBufferFromSAB(audioContext, e.data.samples);
-  addSample(Math.floor(currentStep), sample);
+  // addSample(Math.floor(currentStep), sample);
   addSample(Math.floor(Math.random() * 16), sample);
 }
 const analysisBlockSize = 1024
@@ -45,21 +44,6 @@ async function ensureAudio() {
 }
 
 async function setupLoop() {
-  const LM2 = await loadLN2(audioContext);
-  // const kawai = await loadKawaii(audioContext)
-  makePattern().then(p => {
-    const groove = p.notes.map(note => ({ drum: DRUM_MAP[note.pitch], onset: note.quantizedStartStep }))
-      .filter(n => n.drum)
-
-    let usused = new Set(groove.map(n => n.drum)).difference(new Set(Object.keys(LM2)))
-    if (usused.size) console.warn('unused drum samples:', [...usused])
-
-    groove.map(n => ({ ...n, drum: LM2[n.drum] }))
-      .forEach(({drum, onset}) => addSample(onset, drum))
-  })
-
-  scheduler(audioContext)
-
   await audioContext.audioWorklet.addModule('/src/worklets/noise-gate.worklet.js');
   await audioContext.audioWorklet.addModule('/src/worklets/tap.worklet.js');
   await audioContext.audioWorklet.addModule('/src/worklets/analysis-reader.worklet.js');
@@ -163,6 +147,56 @@ async function setupLoop() {
   analysisReader.connect(recordGain.gain, 2);
 
 
+  const masterGain = audioContext.createGain()
+  masterGain.gain.value = 0.25;
+
+  const analyser = audioContext.createAnalyser();
+  analyser.fftSize = spectrumSize * 2;
+  const buffer = new Float32Array(analyser.fftSize);
+
+  masterGain.connect(analyser);
+  analyser.connect(audioContext.destination);
+
+  function measureVolume() {
+    analyser.getFloatTimeDomainData(buffer);
+    let sum = 0;
+    for (let i = 0; i < buffer.length; i++) {
+      const x = buffer[i];
+      sum += x * x;
+    }
+    const rms = Math.sqrt(sum / buffer.length);
+    const peak = Math.max(...buffer.map(v => Math.abs(v)));
+
+    return { rms, peak }
+  }
+
+  var r = document.querySelector(':root');
+  function updateMeter() {
+    const { rms, peak } = measureVolume();
+    // values range ~0–1, though >1 possible if things are clipping
+    // console.log({ rms, peak });
+    let measured = 200 * peak
+    r.style.setProperty('--shadow-width', `${measured}px`);
+    requestAnimationFrame(updateMeter);
+  }
+  updateMeter();
+
+  const LM2 = await loadLN2(audioContext);
+  // const kawai = await loadKawaii(audioContext)
+  makePattern().then(p => {
+    const groove = p.notes.map(note => ({ drum: DRUM_MAP[note.pitch], onset: note.quantizedStartStep }))
+      .filter(n => n.drum)
+
+    let usused = new Set(groove.map(n => n.drum)).difference(new Set(Object.keys(LM2)))
+    if (usused.size) console.warn('unused drum samples:', [...usused])
+
+    groove.map(n => ({ ...n, drum: LM2[n.drum] }))
+      .forEach(({drum, onset}) => addDrumSample(onset, drum))
+  })
+
+  scheduler(audioContext, masterGain)
+
+
 
   // meters
 
@@ -189,18 +223,21 @@ async function setupLoop() {
 // button
 
 btn.addEventListener('click', async () => {
+  // loading state
   var r = document.querySelector(':root');
   r.style.setProperty('--button-color', 'lightgreen');
-  // btn.style.backgroundColor = 'lightgreen'
   const s = document.createElement('span');
   s.classList.add('loader')
+  const originalInnertext = btn.innerHTML
   btn.innerText = ""
   btn.appendChild(s);
+
   await initMagenta()
-  r.style.setProperty('--button-color', 'green');
-  // btn.style.backgroundColor = 'green'
+
+  // recording state
+  btn.classList.add('disco');
   btn.removeChild(s)
-  btn.innerText = "🔉"
+  btn.innerHTML = originalInnertext
   await ensureAudio()
   await audioContext.resume()
   await setupLoop()

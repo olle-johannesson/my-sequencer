@@ -19,15 +19,28 @@ const velocityByStep = [
 
 const baseGain = 0.8; // overall drum volume
 
+let sampleQueue = []
+
 export function addSample(index, sample) {
+  let uniqueSamples = new Set(sampleQueue)
+  if (uniqueSamples.has(sample) && uniqueSamples.size > 8) {
+    const oldSample = sampleQueue.shift()
+    clearSample(oldSample)
+  } else {
+    sampleQueue.push(sample)
+  }
+  pattern[index].add(sample);
+}
+
+export function addDrumSample(index, sample) {
   pattern[index].add(sample);
 }
 
 export function clearSample(sample) {
-  pattern.forEach(slot => slot.remove(sample));
+  pattern.forEach(slot => slot.delete(sample));
 }
 
-export function scheduler(audioContext) {
+export function scheduler(audioContext, outputNode) {
   if (nextStepTime === undefined) {
     nextStepTime = audioContext?.currentTime + 0.1;
   }
@@ -48,16 +61,16 @@ export function scheduler(audioContext) {
         return {sample, gain}
       }
   )
-      .forEach(({ sample, gain }) => playSampleAt(audioContext, sample, nextStepTime, gain))
+      .forEach(({ sample, gain }) => playSampleAt(audioContext, sample, nextStepTime, gain, outputNode))
 
     currentStep = (currentStep + 1) % pattern.length;
     nextStepTime += stepDuration;
   }
 
-  requestAnimationFrame(() => scheduler(audioContext));
+  requestAnimationFrame(() => scheduler(audioContext, outputNode));
 }
 
-function playSampleAt(audioContext, sample, time, gain = 1) {
+function playSampleAt(audioContext, sample, time, gain = 1, outputNode) {
   const buffer = sample;
   if (!buffer) return;
 
@@ -68,7 +81,7 @@ function playSampleAt(audioContext, sample, time, gain = 1) {
   gainNode.gain.value = gain;
 
   source.connect(gainNode);
-  gainNode.connect(audioContext.destination);
+  gainNode.connect(outputNode);
 
   source.start(time);
 }
