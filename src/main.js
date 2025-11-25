@@ -1,11 +1,13 @@
 import {createMeter} from "./meter.js";
 import {currentStep, scheduler, addSample} from "./looper.js";
 import {audioBufferFromSAB} from "./dsp/audioBufferFromFloatArray.js";
-import {loadLN2} from "./sampleBank.js";
+import {loadKawaii, loadLN2} from "./sampleBank.js";
 import {FEATURE_COUNT} from "./util/mailbox.js";
+import {DRUM_MAP, initMagenta, makePattern} from "./pattern.js";
 
 // buttons
 const btn = document.getElementById('hold');
+const loader = document.getElementById('loader');
 
 // init worker threads
 const analysisWorker = new Worker(new URL('./workers/analysis.worker.js', import.meta.url), {type: 'module'});
@@ -44,16 +46,18 @@ async function ensureAudio() {
 
 async function setupLoop() {
   const LM2 = await loadLN2(audioContext);
-  addSample(0, LM2.kick)
-  addSample(0, LM2.closedHiHat)
-  addSample(4, LM2.snare)
-  addSample(4, LM2.closedHiHat)
-  addSample(7, LM2.kick)
-  addSample(8, LM2.kick)
-  addSample(8, LM2.closedHiHat)
-  addSample(10, LM2.kick)
-  addSample(12, LM2.snare)
-  addSample(12, LM2.closedHiHat)
+  // const kawai = await loadKawaii(audioContext)
+  makePattern().then(p => {
+    const groove = p.notes.map(note => ({ drum: DRUM_MAP[note.pitch], onset: note.quantizedStartStep }))
+      .filter(n => n.drum)
+
+    let usused = new Set(groove.map(n => n.drum)).difference(new Set(Object.keys(LM2)))
+    if (usused.size) console.warn('unused drum samples:', [...usused])
+
+    groove.map(n => ({ ...n, drum: LM2[n.drum] }))
+      .forEach(({drum, onset}) => addSample(onset, drum))
+  })
+
   scheduler(audioContext)
 
   await audioContext.audioWorklet.addModule('/src/worklets/noise-gate.worklet.js');
@@ -163,29 +167,40 @@ async function setupLoop() {
   // meters
 
   // flux gate output
-  const fluxMeter = createMeter(document.getElementById('meter-area'), {
-    label: 'Flux Gate',
-    map: 'linear'
-  });
-  fluxMeter.bindMailbox(audioFeatureSAB);
-
-  // noise gate output
-  const analyser = new AnalyserNode(audioContext, {fftSize: 1024});
-  gate.connect(analyser); // post-noise-gate signal
-  const meter2 = createMeter(document.getElementById('meter-area'), {
-    label: 'Input RMS',
-    threshold: 0.2,
-    map: 'db',
-    dbFloor: -60,
-  });
-  meter2.bindAnalyser(analyser, {fftSize: 1024});
+  // const fluxMeter = createMeter(document.getElementById('meter-area'), {
+  //   label: 'Flux Gate',
+  //   map: 'linear'
+  // });
+  // fluxMeter.bindMailbox(audioFeatureSAB);
+  //
+  // // noise gate output
+  // const analyser = new AnalyserNode(audioContext, {fftSize: 1024});
+  // gate.connect(analyser); // post-noise-gate signal
+  // const meter2 = createMeter(document.getElementById('meter-area'), {
+  //   label: 'Input RMS',
+  //   threshold: 0.2,
+  //   map: 'db',
+  //   dbFloor: -60,
+  // });
+  // meter2.bindAnalyser(analyser, {fftSize: 1024});
 }
 
 
 // button
 
 btn.addEventListener('click', async () => {
-  btn.style.backgroundColor = 'red'
+  var r = document.querySelector(':root');
+  r.style.setProperty('--button-color', 'lightgreen');
+  // btn.style.backgroundColor = 'lightgreen'
+  const s = document.createElement('span');
+  s.classList.add('loader')
+  btn.innerText = ""
+  btn.appendChild(s);
+  await initMagenta()
+  r.style.setProperty('--button-color', 'green');
+  // btn.style.backgroundColor = 'green'
+  btn.removeChild(s)
+  btn.innerText = "🔉"
   await ensureAudio()
   await audioContext.resume()
   await setupLoop()
@@ -195,3 +210,4 @@ btn.addEventListener('pointercancel', () => {
   setRecording(false);
   btn.textContent = 'play';
 });
+

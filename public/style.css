@@ -1,7 +1,13 @@
+:root {
+    --button-color: black;
+    --shadow-width: 30px;
+}
+
 html, body {
     height: 100%;
     margin: 0;
     font-family: system-ui, sans-serif;
+    background: #f0f0f0;
 }
 
 .wrap {
@@ -12,17 +18,23 @@ html, body {
 }
 
 button {
+    min-width: 100px;
+    min-height: 100px;
     font-size: 1.2rem;
     padding: 1rem 1.5rem;
     border-radius: 12px;
     border: 0;
-    background: black;
+    background: var(--button-color);
     color: white;
     cursor: pointer;
+    position: relative;
+    transition: background-color, 0.25s ease-in-out, box-shadow 0.15s ease-out;
+    box-shadow: 0 0 var(--shadow-width) var(--button-color);
 }
 
 button:active {
     transform: scale(0.98);
+    box-shadow: 0 0 calc(var(--shadow-width) / 2) var(--button-color);
 }
 
 
@@ -33,6 +45,26 @@ button:active {
     column-gap: 1em;
     margin: 4em;
     padding: 2em;
+}
+
+.loader {
+    width: 48px;
+    height: 48px;
+    border: 5px solid #FFF;
+    border-bottom-color: transparent;
+    border-radius: 50%;
+    display: inline-block;
+    box-sizing: border-box;
+    animation: rotation 1s linear infinite;
+}
+
+@keyframes rotation {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 .meter {

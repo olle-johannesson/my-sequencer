@@ -1,0 +1,11 @@
+KAWAI R-50e SAMPLES from http:/www.abel.c.uk/~maxim/
+
+These samples are direct, unprocessed samples from
+the Kawai R-50e Drum Machine. This was a late 80's 
+machine with 12-bit 32kHz samples. It was to the 
+orignal R-50 what the Alesis HR16b was to the HR16 
+- More up-front, pop/dance music sounds, rather than 
+trying to emulate an acoustic drum kit. Some of the 
+sounds are 'of their era' (especially the Art Of Noise
+style orchestra hit), but most are still useful!
+
