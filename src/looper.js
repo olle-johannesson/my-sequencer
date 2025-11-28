@@ -40,7 +40,11 @@ export function clearSample(sample) {
   pattern.forEach(slot => slot.delete(sample));
 }
 
-export function scheduler(audioContext, outputNode) {
+export function clearAllSamples() {
+  pattern = [...new Array(16)].map(() => new Set())
+}
+
+export function scheduler(audioContext, outputNode, loop = true) {
   if (nextStepTime === undefined) {
     nextStepTime = audioContext?.currentTime + 0.1;
   }
@@ -66,8 +70,9 @@ export function scheduler(audioContext, outputNode) {
     currentStep = (currentStep + 1) % pattern.length;
     nextStepTime += stepDuration;
   }
-
-  requestAnimationFrame(() => scheduler(audioContext, outputNode));
+  if (loop) {
+    requestAnimationFrame(() => scheduler(audioContext, outputNode));
+  }
 }
 
 function playSampleAt(audioContext, sample, time, gain = 1, outputNode) {

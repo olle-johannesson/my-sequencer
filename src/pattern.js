@@ -3,13 +3,15 @@ import './polyfills';
 
 const drumUrl = 'https://storage.googleapis.com/magentadata/js/checkpoints/music_rnn/drum_kit_rnn';
 const drumSteps = 16;
-let seed, rnn;
+let seed, rnn
+export let magentaIsReady = false;
 
 export async function initMagenta() {
   let module = await import('@magenta/music')
   const { MusicRNN, sequences } = module;
   rnn = new MusicRNN(drumUrl);
   await rnn.initialize();
+  magentaIsReady = true;
 
   seed = {
     notes: [
