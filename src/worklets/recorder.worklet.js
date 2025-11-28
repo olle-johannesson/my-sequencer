@@ -11,15 +11,13 @@ class Recorder extends AudioWorkletProcessor {
     ];
   }
 
-  constructor({ processorOptions }) {
+  constructor() {
     super();
     this.sr = 44100;
     this.len = Math.floor(this.sr * 2);
     this.buf = new Float32Array(this.len);
     this.writeIdx = 0;
     this.wasRecording = 0;
-    this.coolDownLength = 33;
-    this.coolDownCounter = 0;
   }
 
   clearBuffer() {
@@ -39,16 +37,17 @@ class Recorder extends AudioWorkletProcessor {
     const wasPreviouslyRecording = this.wasRecording;
 
     // rising edge → start recording
-    if (!wasPreviouslyRecording && isCurrentlyRecording && this.coolDownCounter === 0) {
+    if (!wasPreviouslyRecording && isCurrentlyRecording) {
       this.clearBuffer();
       w = this.writeIdx;
+      this.port.postMessage({ type: 'rec begin' });
     }
 
     // falling edge → stop recording
     if (wasPreviouslyRecording && !isCurrentlyRecording) {
       const copy = new Float32Array(this.buf);
       this.port.postMessage({ type: 'audio', audio: copy }, [copy.buffer]);
-      this.coolDownCounter = this.coolDownLength;
+      this.port.postMessage({ type: 'rec end' });
     }
 
     // record samples
@@ -60,8 +59,6 @@ class Recorder extends AudioWorkletProcessor {
 
     this.writeIdx = w;
     this.wasRecording = isCurrentlyRecording;
-    this.coolDownCounter = Math.max(this.coolDownCounter - 1, 0);
-
     return true;
   }
 }
