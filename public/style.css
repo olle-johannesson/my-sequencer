@@ -1,6 +1,9 @@
 :root {
-    --button-color: black;
+    --button-color: #333333;
     --shadow-width: 30px;
+    --ripple-inner: #FF4136;
+    --ripple-outer: #FFB700;
+    --ripple-speed: .5s;
 }
 
 html, body {
@@ -23,12 +26,24 @@ button {
     color: white;
     cursor: pointer;
     position: relative;
-    transition: all 0.2s ease;
+    /*transition: all 0.2s ease;*/
+    transition: background-color .35s ease-out,
+                box-shadow .25s ease-in-out,
+                transform 0.15s ease-out;
     box-shadow: 0 0 var(--shadow-width) var(--button-color);
+}
+
+button {
+    --button-color: #333333;
 }
 
 button:hover {
     transform: scale(1.05);
+    --button-color: #FFB700;
+}
+
+button.disco {
+    --button-color: lightgreen;
 }
 
 button:active {
@@ -42,6 +57,40 @@ button svg {
     display: inline-block;
 }
 
+button .ripple-circles {
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    position: absolute;
+    /*inset: calc(-1 * var(--shadow-width)); !* expand beyond button if you like *!*/
+    pointer-events: none;
+}
+
+button .ripple-circle {
+    border-radius: 50%;
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    opacity: 0;
+
+    /*background: radial-gradient(*/
+    /*        circle,*/
+    /*        var(--ripple-inner) 0%,*/
+    /*        var(--ripple-outer) 70%*/
+    /*);*/
+
+    background-color: red;
+    /*background-blend-mode: color-dodge;*/
+    animation: none;
+}
+
+button.recording .ripple-circle {
+    animation: growAndFade var(--ripple-speed) infinite ease-out;
+}
+
+
 .loader {
     width: 48px;
     height: 48px;
@@ -54,6 +103,7 @@ button svg {
 }
 
 .mic-star {
+    z-index: 1;
     position: absolute;
     width: 16px;
     height: 16px;
@@ -74,7 +124,7 @@ button:hover>.mic-star, button:focus>.mic-star, .disco>.mic-star {
     left: var(--x, 0%);
     transform: translate(-50%, -50%) scale(var(--scale, 1));
     animation: twinkle var(--dur, 2.5s) ease-in-out infinite;
-    animation-delay: var(--delay, 0s);
+    /*animation-delay: var(--delay, 0s);*/
 }
 
 .disco {
@@ -107,7 +157,18 @@ button:hover>.mic-star, button:focus>.mic-star, .disco>.mic-star {
     60% { opacity: 0.7; }
 }
 
-.star1 {
+@keyframes growAndFade {
+    0% {
+        opacity: 0.5;
+        transform: scale(0);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(1);
+    }
+}
+
+.mic-star-1 {
     --x: 15%;
     --y: 20%;
     --scale: 1;
@@ -115,7 +176,7 @@ button:hover>.mic-star, button:focus>.mic-star, .disco>.mic-star {
     --dur: 2.4s;
 }
 
-.star2 {
+.mic-star-2 {
     --x: 85%;
     --y: 25%;
     --scale: 1.2;
@@ -123,7 +184,7 @@ button:hover>.mic-star, button:focus>.mic-star, .disco>.mic-star {
     --dur: 2.9s;
 }
 
-.star3 {
+.mic-star-3 {
     --x: 65%;
     --y: 75%;
     --scale: 0.9;
@@ -131,7 +192,7 @@ button:hover>.mic-star, button:focus>.mic-star, .disco>.mic-star {
     --dur: 3.2s;
 }
 
-.star4 {
+.mic-star-4 {
     --x: 55%;
     --y: 25%;
     --scale: 0.4;
@@ -139,11 +200,31 @@ button:hover>.mic-star, button:focus>.mic-star, .disco>.mic-star {
     --dur: 3.2s;
 }
 
-.star5 {
+.mic-star-5 {
     --x: 21%;
     --y: 80%;
     --scale: 0.9;
     --delay: 1.8s;
     --dur: 3.8s;
+}
+
+#ripple-circle-1 {
+    background-blend-mode: screen;
+    mix-blend-mode: screen;
+    /*animation: growAndFade var(--ripple-speed) infinite ease-out;*/
+}
+
+#ripple-circle-2 {
+    background-blend-mode: color-dodge;
+    mix-blend-mode: color-dodge;
+    /*animation: growAndFade var(--ripple-speed) infinite ease-out;*/
+    animation-delay: calc(var(--ripple-speed) / 3);
+}
+
+#ripple-circle-3 {
+    background-blend-mode: difference;
+    mix-blend-mode: difference;
+    /*animation: growAndFade var(--ripple-speed) infinite ease-out;*/
+    animation-delay: calc(var(--ripple-speed) / 2);
 }
 
