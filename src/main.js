@@ -1,9 +1,10 @@
-import {addDrumSample, addSample, bpm, clearAllSamples, currentStep, scheduler} from "./looper.js";
+import {addDrumSample, addSample, clearAllSamples, scheduler} from "./looper.js";
 import {audioBufferFromSAB} from "./dsp/audioBufferFromFloatArray.js";
-import {loadLN2} from "./sampleBank.js";
+import {loadRandomDrums} from "./drums/loadRandomDrums.js";
 import {FEATURE_COUNT} from "./util/mailbox.js";
-import {DRUM_MAP, initMagenta, magentaIsReady, makePattern} from "./pattern.js";
+import {initMagenta, magentaIsReady, makePattern} from "./pattern.js";
 import {getNormallyDistributedNumber} from "./util/random.js";
+import {DRUM_TO_PITCH, PITCH_TO_DRUM} from "./drums/drumNameMaps.js";
 
 const LOADER_CLASS = 'loader';
 const DISCO_CLASS = 'disco';
@@ -36,7 +37,7 @@ const noiseSpectrumSAB = new SharedArrayBuffer(
 );
 
 
-async function ensureAudio() {
+async function ensureAudioContextIsRunning() {
   if (audioContext) {
     if (audioContext.state === 'suspended') {
       await audioContext.resume();
@@ -166,28 +167,28 @@ async function startLoop() {
     return Math.max(...buffer.map(v => Math.abs(v)));
   }
 
-  const r = document.querySelector(':root');
+  const documentRoot = document.querySelector(':root');
 
   function updateMeter() {
     let measured = 300 * measurePeakVolume()
-    r.style.setProperty('--shadow-width', `${measured}px`);
+    documentRoot.style.setProperty('--shadow-width', `${measured}em`);
     requestAnimationFrame(updateMeter);
   }
 
-  const LM2 = await loadLN2(audioContext);
-  // const kawai = await loadKawaii(audioContext)
-  makePattern().then(p => {
-    const drumPattern = p.notes
-      .map(note => ({drum: DRUM_MAP[note.pitch], onset: note.quantizedStartStep}))
+  const initialDrumSeed = {
+    notes: [
+      { pitch: DRUM_TO_PITCH.kick, startTime: 0,   endTime: 0.5 },
+      { pitch: DRUM_TO_PITCH.snare, startTime: 0.5, endTime: 1.0 },
+    ],
+    totalTime: 1.0,
+  }
+
+  const drumSamples = await loadRandomDrums(audioContext);
+  makePattern(initialDrumSeed, 1.3).then(p => {
+    p.notes
+      .map(note => ({ drum: PITCH_TO_DRUM[note.pitch], onset: note.quantizedStartStep }))
       .filter(n => n.drum)
-
-    let usused = new Set(drumPattern.map(n => n.drum)).difference(new Set(Object.keys(LM2)))
-    if (usused.size) {
-      console.debug('unused drum samples:', [...usused])
-    }
-
-    drumPattern
-      .map(n => ({...n, drum: LM2[n.drum]}))
+      .map(n => ({...n, drum: drumSamples[n.drum]}))
       .forEach(({drum, onset}) => addDrumSample(onset, drum))
   })
 
@@ -208,20 +209,20 @@ btn.addEventListener('click', async () => {
     isPlaying = false
   } else {
     isPlaying = true
-    await ensureAudio()
+    await ensureAudioContextIsRunning()
 
     if (!magentaIsReady) {
-      const s = document.createElement('span');
-      s.classList.add(LOADER_CLASS)
       const originalInnertext = btn.innerHTML
+      const loader = document.createElement('span');
+      loader.classList.add(LOADER_CLASS)
       btn.innerText = ""
-      btn.appendChild(s);
+      btn.appendChild(loader);
 
       await initMagenta()
 
-      btn.removeChild(s)
+      btn.removeChild(loader)
       btn.innerHTML = originalInnertext
-      s.classList.remove(LOADER_CLASS)
+      loader.classList.remove(LOADER_CLASS)
     }
 
     btn.classList.add(DISCO_CLASS);
@@ -229,8 +230,8 @@ btn.addEventListener('click', async () => {
   }
 })
 
-btn.addEventListener('pointercancel', () => {
-  setRecording(false);
-  btn.textContent = 'play';
-});
+// btn.addEventListener('pointercancel', () => {
+//   setRecording(false);
+//   btn.textContent = 'play';
+// });
 

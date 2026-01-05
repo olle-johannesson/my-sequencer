@@ -6,6 +6,11 @@
     --ripple-speed: .5s;
 }
 
+html {
+    /*background-color: #F0FCFF;*/
+    /*animation: disco-color-rotation2 120s linear infinite;*/
+}
+
 html, body {
     height: 100%;
     margin: 0;

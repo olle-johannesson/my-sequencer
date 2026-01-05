@@ -18,10 +18,10 @@ let noiseRms = 0;
 let recordingState = 0;
 
 // hysteresis:
-const START_FACTOR = 0.4;   // how far above noise to start
-const STOP_FACTOR  = 0.2;   // how far above noise to keep going
+const START_FACTOR = 0.1;   // how far above noise to start
+const STOP_FACTOR  = 0.1;   // how far above noise to keep going
 const MIN_FRAMES_ABOVE = 1;  // frames above start threshold to trigger
-const MIN_FRAMES_BELOW = 2; // frames below stop threshold to stop
+const MIN_FRAMES_BELOW = 1; // frames below stop threshold to stop
 const hysteresisGate = createConsecutiveGate(MIN_FRAMES_ABOVE, MIN_FRAMES_BELOW);
 
 
@@ -153,6 +153,7 @@ onmessage = async (e) => {
 
       // Make sure we're not recording before updating the noise model.
       if ((recordingState === 0) && (rms < rmsThreshold)) {
+        // console.log(rms.toFixed(4), rmsThreshold.toFixed(4))
         updateNoiseModel(amplitudeSpectrum);
       }
 

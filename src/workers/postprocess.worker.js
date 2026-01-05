@@ -41,7 +41,6 @@ self.onmessage = (e) => {
     }
 
     default: {
-
       const {samples, sampleRate} = e.data;
       const copy = new Float32Array(samples);
       updateLocalNoiseSpectrum()
@@ -63,7 +62,6 @@ self.onmessage = (e) => {
       // apply clip-friendly envelope
       const processed = new Float32Array(deNoised.length);
       processed.set(deNoised);
-      // console.log({ processed, deNoised })
       applyEnvelope(processed, sampleRate);
 
       self.postMessage({samples: processed, sampleRate}, [processed.buffer]);
