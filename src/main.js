@@ -1,10 +1,10 @@
-import {addDrumSample, addSample, clearAllSamples, scheduler} from "./looper.js";
+import {clearAllSamples, clearSample, scheduler, scheduleSample} from "./looper.js";
 import {audioBufferFromSAB} from "./dsp/audioBufferFromFloatArray.js";
 import {loadRandomDrums} from "./drums/loadRandomDrums.js";
 import {FEATURE_COUNT} from "./util/mailbox.js";
-import {initMagenta, magentaIsReady, makePattern} from "./pattern.js";
-import {getNormallyDistributedNumber} from "./util/random.js";
+import {continuePattern, initMagenta, magentaIsReady} from "./magentaHelper.js";
 import {DRUM_TO_PITCH, PITCH_TO_DRUM} from "./drums/drumNameMaps.js";
+import {addNewRecordedSample} from './pattern.js'
 
 const LOADER_CLASS = 'loader';
 const DISCO_CLASS = 'disco';
@@ -19,13 +19,8 @@ analysisWorker.onerror = (e) => console.error('analysis worker error', e);
 
 const postProcessWorker = new Worker(new URL('./workers/postprocess.worker.js', import.meta.url), {type: 'module'});
 postProcessWorker.onerror = (e) => console.error('post-process Worker error', e);
-postProcessWorker.onmessage = (e) => {
-  const sample = audioBufferFromSAB(audioContext, e.data.samples);
-  const numberOfTimesToAddSample = Math.round(getNormallyDistributedNumber(2, 0.5));
-  for (let i = 0; i < numberOfTimesToAddSample; i++) {
-    addSample(Math.floor(Math.random() * 16), sample);
-  }
-}
+postProcessWorker.onmessage = (e) =>
+  addNewRecordedSample(audioBufferFromSAB(audioContext, e.data.samples), scheduleSample, clearSample)
 
 // shared buffers
 const audioFeatureSAB = new SharedArrayBuffer(
@@ -184,12 +179,12 @@ async function startLoop() {
   }
 
   const drumSamples = await loadRandomDrums(audioContext);
-  makePattern(initialDrumSeed, 1.3).then(p => {
+  continuePattern(initialDrumSeed, 1.3).then(p => {
     p.notes
       .map(note => ({ drum: PITCH_TO_DRUM[note.pitch], onset: note.quantizedStartStep }))
       .filter(n => n.drum)
       .map(n => ({...n, drum: drumSamples[n.drum]}))
-      .forEach(({drum, onset}) => addDrumSample(onset, drum))
+      .forEach(({drum, onset}) => scheduleSample(onset, drum))
   })
 
   updateMeter()
@@ -199,39 +194,40 @@ async function startLoop() {
 
 // button
 
-btn.addEventListener('click', async () => {
-  const root = document.querySelector(':root');
-
-  if (isPlaying) {
-    btn.classList.remove(DISCO_CLASS);
-    await audioContext.suspend()
-    clearAllSamples()
-    isPlaying = false
-  } else {
-    isPlaying = true
-    await ensureAudioContextIsRunning()
-
-    if (!magentaIsReady) {
-      const originalInnertext = btn.innerHTML
-      const loader = document.createElement('span');
-      loader.classList.add(LOADER_CLASS)
-      btn.innerText = ""
-      btn.appendChild(loader);
-
-      await initMagenta()
-
-      btn.removeChild(loader)
-      btn.innerHTML = originalInnertext
-      loader.classList.remove(LOADER_CLASS)
-    }
-
-    btn.classList.add(DISCO_CLASS);
-    startLoop()
+function showLoader() {
+  const originalInnerHtml = btn.innerHTML
+  const loader = document.createElement('span');
+  loader.classList.add(LOADER_CLASS)
+  btn.innerText = ""
+  btn.appendChild(loader);
+  return () => {
+    btn.removeChild(loader)
+    btn.innerHTML = originalInnerHtml
+    loader.classList.remove(LOADER_CLASS)
   }
-})
+}
 
-// btn.addEventListener('pointercancel', () => {
-//   setRecording(false);
-//   btn.textContent = 'play';
-// });
+async function ensureMagentaIsLoaded() {
+  if (!magentaIsReady) {
+    const removeLoader = showLoader()
+    await initMagenta()
+    removeLoader()
+  }
+}
 
+async function start() {
+  await ensureAudioContextIsRunning()
+  await ensureMagentaIsLoaded()
+  await startLoop()
+  btn.classList.add(DISCO_CLASS);
+  btn.addEventListener('click', stop, { once: true })
+}
+
+async function stop() {
+  await audioContext.suspend()
+  clearAllSamples()
+  btn.classList.remove(DISCO_CLASS);
+  btn.addEventListener('click', start, { once: true })
+}
+
+btn.addEventListener('click', start, { once: true })
