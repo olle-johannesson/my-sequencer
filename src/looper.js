@@ -1,5 +1,6 @@
 import {thunk} from "./util/thunk.js";
 import {getNormallyDistributedNumber} from "./util/random.js";
+import {clamp} from "./util/clamp.js";
 
 export let bpm = 120;
 let currentStep = 0
@@ -7,7 +8,7 @@ let nextStepTime = undefined
 let scheduledSamples = [...new Array(16)].map(() => new Set())
 const currentlyPlaying = new Map()
 const stepsPerBeat = 4;
-const stepDuration = 60 / bpm / stepsPerBeat;
+const calculateStepDuration = () => 60 / bpm / stepsPerBeat;
 const scheduleAheadTime = 0.1;
 const baseGain = 0.8;
 const velocityByStep = [
@@ -16,6 +17,14 @@ const velocityByStep = [
   0.9, 0.5, 0.7, 0.5,
   0.8, 0.4, 0.6, 0.5
 ];
+const commonBpmSettings = [ 72, 88, 96, 112, 120, 132, 144 ]
+
+export function rndBpm() {
+  const maxIndex = commonBpmSettings.length - 1
+  const rndIndex = Math.round(getNormallyDistributedNumber(maxIndex / 2, 2))
+  const clamped = clamp(rndIndex, 0, maxIndex)
+  bpm = commonBpmSettings[clamped]
+}
 
 /**
  * Schedule a new sample to be played
@@ -61,7 +70,7 @@ export function scheduler(audioContext, outputNode, loop = true) {
       })
 
     currentStep = (currentStep + 1) % scheduledSamples.length;
-    nextStepTime += stepDuration;
+    nextStepTime += calculateStepDuration();
   }
   if (loop) {
     requestAnimationFrame(() => scheduler(audioContext, outputNode));

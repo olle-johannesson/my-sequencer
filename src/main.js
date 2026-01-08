@@ -1,10 +1,11 @@
-import {clearAllSamples, clearSample, scheduler, scheduleSample} from "./looper.js";
+import {bpm, clearAllSamples, clearSample, scheduler, scheduleSample, rndBpm} from "./looper.js";
 import {audioBufferFromSAB} from "./dsp/audioBufferFromFloatArray.js";
 import {loadRandomDrums} from "./drums/loadRandomDrums.js";
 import {FEATURE_COUNT} from "./util/mailbox.js";
 import {continuePattern, initMagenta, magentaIsReady} from "./magentaHelper.js";
 import {DRUM_TO_PITCH, PITCH_TO_DRUM} from "./drums/drumNameMaps.js";
 import {addNewRecordedSample} from './pattern.js'
+import {getNormallyDistributedNumber} from "./util/random.js";
 
 const LOADER_CLASS = 'loader';
 const DISCO_CLASS = 'disco';
@@ -45,6 +46,8 @@ async function ensureAudioContextIsRunning() {
 }
 
 async function startLoop() {
+  rndBpm()
+  console.log(bpm)
   await audioContext.audioWorklet.addModule('/src/worklets/tap.worklet.js');
   await audioContext.audioWorklet.addModule('/src/worklets/analysis-reader.worklet.js');
   await audioContext.audioWorklet.addModule('/src/worklets/recorder.worklet.js');
@@ -171,9 +174,13 @@ async function startLoop() {
   }
 
   const initialDrumSeed = {
+    // boom chack boom-boom chack
     notes: [
-      { pitch: DRUM_TO_PITCH.kick, startTime: 0,   endTime: 0.5 },
-      { pitch: DRUM_TO_PITCH.snare, startTime: 0.5, endTime: 1.0 },
+      { pitch: DRUM_TO_PITCH.kick, startTime: 0,   endTime: 0.25 },
+      { pitch: DRUM_TO_PITCH.snare, startTime: 0.25, endTime: 0.5 },
+      { pitch: DRUM_TO_PITCH.kick, startTime: 0.5, endTime: 0.75 },
+      { pitch: DRUM_TO_PITCH.kick, startTime: 0.625, endTime: 0.75 },
+      { pitch: DRUM_TO_PITCH.snare, startTime: 0.75, endTime: 1.0 },
     ],
     totalTime: 1.0,
   }
