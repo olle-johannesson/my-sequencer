@@ -1,10 +1,18 @@
 import {loadKawaii} from "./loaders/loadKawaii.js";
 import {loadLN2} from "./loaders/loadLN2.js";
+import {loadCR78} from "./loaders/loadCR78.js";
+import {loadKRmini} from "./loaders/loadKRmini.js";
+import {loadLINN9000} from "./loaders/loadLINN9000.js";
+import {loadSDS5} from "./loaders/loadSDS5.js";
 
 
 const loaders = [
   loadKawaii,
-  loadLN2
+  loadLN2,
+  loadCR78,
+  loadKRmini,
+  loadLINN9000,
+  loadSDS5
 ]
 
 export async function loadRandomDrums(audioContext) {

@@ -8,7 +8,9 @@ import {loadSample} from "../loadSample.js";
 let KawaiiCache
 
 export async function loadKawaii(audioContext) {
+  console.log('loading Kawaii')
   if (KawaiiCache) { return KawaiiCache; }
+
   const [
     kick,
     snare,

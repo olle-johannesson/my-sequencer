@@ -9,6 +9,7 @@ import {loadSample} from "../loadSample.js";
 let LN2Cache
 
 export async function loadLN2(audioContext) {
+  console.log('loading LN-2')
   if (LN2Cache) { return LN2Cache; }
 
   const [
