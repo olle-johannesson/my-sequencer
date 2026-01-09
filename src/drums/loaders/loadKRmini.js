@@ -10,7 +10,6 @@ import {loadSample} from "../loadSample.js";
 let KRminiCache
 
 export async function loadKRmini(audioContext) {
-  console.log('loading KR mini')
   if (KRminiCache) { return KRminiCache; }
 
   const [

@@ -12,7 +12,6 @@ import {loadSample} from "../loadSample.js";
 let SDS5Cache
 
 export async function loadSDS5(audioContext) {
-  console.log('loading SDS5')
   if (SDS5Cache) { return SDS5Cache; }
 
   const [

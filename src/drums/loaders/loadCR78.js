@@ -12,7 +12,6 @@ import {loadSample} from "../loadSample.js";
 let CR78Cache
 
 export async function loadCR78(audioContext) {
-  console.log('loading CR-78')
   if (CR78Cache) { return CR78Cache; }
 
   const [

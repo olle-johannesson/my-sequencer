@@ -16,8 +16,9 @@ html, body {
     margin: 0;
     font-family: system-ui, sans-serif;
     display: flex;
-    justify-content: center;
+    justify-content: space-around;
     align-items: center;
+    flex-direction: column;
 }
 
 button {
@@ -36,6 +37,33 @@ button {
                 box-shadow .25s ease-in-out,
                 transform 0.15s ease-out;
     box-shadow: 0 0 var(--shadow-width) var(--button-color);
+}
+
+#fx {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    transition: all .2s ease;
+}
+
+
+
+#fx > button {
+  min-width: 0;
+  min-height: 0;
+  border-radius: 0;
+  margin: .25em;
+  background-color: lightblue;
+  box-shadow: 0 0 0 0;
+  transition: all .15s ease-out;
+}
+
+#fx > button:hover {
+    filter: brightness(1.05);
+}
+
+#fx > button:active {
+    transform: scale(0.975);
+    filter: hue-rotate(-10deg)
 }
 
 button {

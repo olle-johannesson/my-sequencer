@@ -1,11 +1,16 @@
 import {thunk} from "./util/thunk.js";
 import {getNormallyDistributedNumber} from "./util/random.js";
 import {clamp} from "./util/clamp.js";
+import {allPresets, createFxEngine} from "./effects/fxEngine.js";
+import {continueEffectPattern} from "./pattern.js";
 
 export let bpm = 120;
+let fxi = 0
 let currentStep = 0
 let nextStepTime = undefined
 let scheduledSamples = [...new Array(16)].map(() => new Set())
+let scheduledFx = [...new Array(16)].map(() => null);
+
 const currentlyPlaying = new Map()
 const stepsPerBeat = 4;
 const calculateStepDuration = () => 60 / bpm / stepsPerBeat;
@@ -17,7 +22,7 @@ const velocityByStep = [
   0.9, 0.5, 0.7, 0.5,
   0.8, 0.4, 0.6, 0.5
 ];
-const commonBpmSettings = [ 72, 88, 96, 112, 120, 132, 144 ]
+const commonBpmSettings = [72, 88, 96, 112, 120, 132, 144]
 
 export function rndBpm() {
   const maxIndex = commonBpmSettings.length - 1
@@ -36,6 +41,15 @@ export function scheduleSample(index, sample) {
 }
 
 /**
+ * Schedule a new effect
+ * @param index {number}
+ * @param fx {{ chain: string, preset: string }}
+ */
+export function scheduleFx(index, fx) {
+  scheduledFx[index] = fx
+}
+
+/**
  * Clear a sample from the playing schedule
  * @param sample {AudioBuffer}
  */
@@ -50,12 +64,33 @@ export function clearAllSamples() {
   scheduledSamples = [...new Array(16)].map(() => new Set())
 }
 
-export function scheduler(audioContext, outputNode, loop = true) {
+/**
+ * Remove all effects from the effect schedule
+ */
+export function clearAllFx() {
+  scheduledFx = [...new Array(16)].map(() => null);
+}
+
+let g
+
+export function scheduler(audioContext, outputNode) {
+  // if (!fxEngine) {
+  //   fxEngine = createFxEngine(audioContext)
+  // }
   if (nextStepTime === undefined) {
     nextStepTime = audioContext?.currentTime + 0.1;
   }
 
   while (nextStepTime < audioContext.currentTime + scheduleAheadTime) {
+    // if (!g) {
+    //   g = audioContext.createGain();
+    //   g.gain.value = 1
+    // }
+    // const scheduledEffect = scheduledFx[currentStep];
+    // if (scheduledEffect) {
+    //   fxEngine.activate(scheduledEffect.chain, scheduledEffect.preset, nextStepTime, g, outputNode)
+    // }
+
     const stepSamples = scheduledSamples[currentStep] ?? new Set()
     const stepVelocity = velocityByStep[currentStep % velocityByStep.length] ?? 1;
 
@@ -66,15 +101,26 @@ export function scheduler(audioContext, outputNode, loop = true) {
       .forEach(sample => {
         const humanFactor = getNormallyDistributedNumber(0, 0.05);
         const gain = baseGain * stepVelocity + humanFactor;
+        // const outputToUse = scheduledEffect ? g : outputNode
         playSampleAt(audioContext, sample, nextStepTime, gain, outputNode)
       })
 
+    // if (currentStep === 0) {
+    // //   continueEffectPattern((i, p) => scheduleFx(i, allPresets[p]), clearAllFx)
+    //   clearAllFx()
+    //   console.log(allPresets[fxi])
+    //   const someStep = 0 // Math.floor(Math.random() * 16)
+    //   for (let i = someStep; i < 16; i++) {
+    //     scheduleFx(fxi, allPresets[fxi])
+    //     // scheduleFx(Math.min(someStep + i, 15), allPresets[Math.floor(Math.random() * allPresets.length)])
+    //   }
+    //   fxi = ++fxi % allPresets.length
+    // }
     currentStep = (currentStep + 1) % scheduledSamples.length;
     nextStepTime += calculateStepDuration();
   }
-  if (loop) {
-    requestAnimationFrame(() => scheduler(audioContext, outputNode));
-  }
+
+  requestAnimationFrame(() => scheduler(audioContext, outputNode));
 }
 
 function stopWithFade(audioContext, bufferSource, gainNode, fadeMs = 5) {

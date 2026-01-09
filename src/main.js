@@ -1,11 +1,11 @@
-import {bpm, clearAllSamples, clearSample, scheduler, scheduleSample, rndBpm} from "./looper.js";
+import {bpm, clearAllSamples, clearSample, rndBpm, scheduler, scheduleSample} from "./looper.js";
 import {audioBufferFromSAB} from "./dsp/audioBufferFromFloatArray.js";
 import {loadRandomDrums} from "./drums/loadRandomDrums.js";
 import {FEATURE_COUNT} from "./util/mailbox.js";
 import {continuePattern, initMagenta, magentaIsReady} from "./magentaHelper.js";
-import {DRUM_TO_PITCH, PITCH_TO_DRUM} from "./drums/drumNameMaps.js";
-import {addNewRecordedSample} from './pattern.js'
-import {getNormallyDistributedNumber} from "./util/random.js";
+import {PITCH_TO_DRUM} from "./drums/drumNameMaps.js";
+import {aConservativeSeed, addNewRecordedSample} from './pattern.js'
+import {allPresets, createFxEngine} from "./effects/fxEngine.js";
 
 const LOADER_CLASS = 'loader';
 const DISCO_CLASS = 'disco';
@@ -47,10 +47,11 @@ async function ensureAudioContextIsRunning() {
 
 async function startLoop() {
   rndBpm()
-  console.log(bpm)
   await audioContext.audioWorklet.addModule('/src/worklets/tap.worklet.js');
   await audioContext.audioWorklet.addModule('/src/worklets/analysis-reader.worklet.js');
   await audioContext.audioWorklet.addModule('/src/worklets/recorder.worklet.js');
+  await audioContext.audioWorklet.addModule('/src/worklets/bitcrusher.worklet.js');
+  await audioContext.audioWorklet.addModule('/src/worklets/grain-player.worklet.js');
 
   stream = await navigator.mediaDevices.getUserMedia({
     audio: {
@@ -160,6 +161,20 @@ async function startLoop() {
     .connect(outputAnalyser)
     .connect(audioContext.destination);
 
+  const fxEngine = createFxEngine(audioContext)
+  document.getElementById("fx").querySelectorAll("button").forEach(btn => {
+    btn.addEventListener('pointerdown', () => {
+      masterGain.disconnect(outputAnalyser)
+      const preset = allPresets[btn.id]
+      fxEngine.activate(preset.chain, preset.preset, audioContext.currentTime, masterGain, outputAnalyser)
+    })
+    btn.addEventListener('pointerup', () => {
+      fxEngine.deactivate()
+      masterGain.connect(outputAnalyser)
+    })
+  })
+
+
   function measurePeakVolume() {
     outputAnalyser.getFloatTimeDomainData(buffer);
     return Math.max(...buffer.map(v => Math.abs(v)));
@@ -173,20 +188,8 @@ async function startLoop() {
     requestAnimationFrame(updateMeter);
   }
 
-  const initialDrumSeed = {
-    // boom chack boom-boom chack
-    notes: [
-      { pitch: DRUM_TO_PITCH.kick, startTime: 0,   endTime: 0.25 },
-      { pitch: DRUM_TO_PITCH.snare, startTime: 0.25, endTime: 0.5 },
-      { pitch: DRUM_TO_PITCH.kick, startTime: 0.5, endTime: 0.75 },
-      { pitch: DRUM_TO_PITCH.kick, startTime: 0.625, endTime: 0.75 },
-      { pitch: DRUM_TO_PITCH.snare, startTime: 0.75, endTime: 1.0 },
-    ],
-    totalTime: 1.0,
-  }
-
   const drumSamples = await loadRandomDrums(audioContext);
-  continuePattern(initialDrumSeed, 1.3).then(p => {
+  continuePattern(aConservativeSeed, 1.3).then(p => {
     p.notes
       .map(note => ({ drum: PITCH_TO_DRUM[note.pitch], onset: note.quantizedStartStep }))
       .filter(n => n.drum)

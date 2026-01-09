@@ -1,4 +1,3 @@
-// src/param-source.worklet.js
 import {createFeatureMailboxViews} from "../util/mailbox.js";
 import {gainFromRms, hpfFreqFromCentroid} from "../dsp/featureConversion.js";
 

@@ -1,13 +1,16 @@
 import {continuePattern} from "./magentaHelper.js";
 import {getNormallyDistributedNumber} from "./util/random.js";
 import {evenlySpacedPartitions} from "./util/evenlySpacedPartitions.js";
+import {DRUM_TO_PITCH} from "./drums/drumNameMaps.js";
 
 const maxAttemptsToScheduleNewSample = 5
 const maxSamples = 5
+const maxEffects = 3
 let nextSample = 0
+let nextEffect = 0
 
 // DrumsRNN-friendly “filler” pitches
-const ghostPitches = [
+const goodFillerPitches = [
   45, // Low Tom
   48, // Mid Tom
   50, // High Tom
@@ -17,15 +20,42 @@ const ghostPitches = [
   51, // Ride
 ];
 
+const pitchesNotCollidingWithTheFillerPitches = [
+  72, 73, 74, 75,
+  76, 77, 78, 79,
+  80, 81, 82, 83,
+  84, 85, 86, 87,
+  88, 89, 90, 91,
+];
+
 /**
  * @type {*[{ pitch: number, sample: AudioBuffer }][]}
  */
-let pattern = [
+let samplePattern = [
   [],[],[],[],
   [],[],[],[],
   [],[],[],[],
   [],[],[],[]
 ]
+
+let effectPattern = [
+  0, 0, 0, 0,
+  0, 0, 0, 0,
+  0, 0, 0, 0,
+  0, 0, 0, 0,
+]
+
+export const aConservativeSeed = {
+  // boom chack boom-boom chack
+  notes: [
+    { pitch: DRUM_TO_PITCH.kick, startTime: 0,   endTime: 0.25 },
+    { pitch: DRUM_TO_PITCH.snare, startTime: 0.25, endTime: 0.5 },
+    { pitch: DRUM_TO_PITCH.kick, startTime: 0.5, endTime: 0.75 },
+    { pitch: DRUM_TO_PITCH.kick, startTime: 0.625, endTime: 0.75 },
+    { pitch: DRUM_TO_PITCH.snare, startTime: 0.75, endTime: 1.0 },
+  ],
+  totalTime: 1.0,
+}
 
 
 
@@ -50,17 +80,42 @@ let pattern = [
  */
 export async function addNewRecordedSample(sample, scheduleSample, clearSample) {
   const index = ++nextSample % maxSamples
-  const ghostPitch = ghostPitches[index]
+  const ghostPitch = goodFillerPitches[index]
 
-  pattern = clearPitchFromPattern(ghostPitch, pattern, clearSample)
-  const seed = makeSeedWithGhostPitchFromPattern(ghostPitch, pattern, 2);
+  samplePattern = clearPitchFromPattern(ghostPitch, samplePattern, clearSample)
+  const seed = makeSeedWithGhostPitchFromPattern(ghostPitch, samplePattern, 2);
   const quantizedStartSteps = await getQuantizedStartStepsForPitch(seed, ghostPitch)
   quantizedStartSteps.forEach(quantizedStartStep => {
-    pattern[quantizedStartStep].push({ pitch: ghostPitch, sample })
+    samplePattern[quantizedStartStep].push({ pitch: ghostPitch, sample })
     scheduleSample(quantizedStartStep, sample)
   })
 }
 
+export async function continueEffectPattern(scheduleEffect, clearAllEffects) {
+  const ghostPitchIndex = ++nextEffect % pitchesNotCollidingWithTheFillerPitches.length
+  const ghostPitch = pitchesNotCollidingWithTheFillerPitches[ghostPitchIndex]
+
+  const oldNotes = effectPattern.map((pitch, i) => pitch ? patternEntryToSeedEntry(pitch) : null).filter(Boolean)
+  const ghostNotesToAdd = evenlySpacedPartitions(2).map(t => patternEntryToSeedEntry(ghostPitch, t))
+  const seed = seedFromSeedEntries(oldNotes, ghostNotesToAdd)
+  const quantizedStartSteps = await getQuantizedStartStepsForPitch(seed, ghostPitch, 0.003)
+  effectPattern = effectPattern.map((pitch, index) => {
+    if (quantizedStartSteps.includes(index)) {
+      return ghostPitch
+    } else if (pitch + maxEffects < ghostPitch) {
+      return 0
+    } else {
+      return pitch
+    }
+  })
+
+  clearAllEffects()
+  effectPattern.forEach((pitch, index) => {
+    if (pitch >= pitchesNotCollidingWithTheFillerPitches[0]) {
+      scheduleEffect(index, pitch - pitchesNotCollidingWithTheFillerPitches[0])
+    }
+  })
+}
 
 
 
@@ -111,12 +166,12 @@ const makeSeedWithGhostPitchFromPattern = (ghostPitch, pattern, timesToAddGhostP
  * @param pitch {number}
  * @return {Promise<number[]>}
  */
-const getQuantizedStartStepsForPitch = async (seed, pitch) => {
+const getQuantizedStartStepsForPitch = async (seed, pitch, temperature = 1.5) => {
   let newDrumOnsets = []
   let attempts = 0
 
   while (attempts < maxAttemptsToScheduleNewSample && newDrumOnsets.length === 0) {
-    const newPattern = await continuePattern(seed, 1.5 + attempts / 10)
+    const newPattern = await continuePattern(seed, temperature + attempts / 10)
     newDrumOnsets = newPattern.notes
       .filter(notes => notes.pitch === pitch)
       .map(note => note.quantizedStartStep)

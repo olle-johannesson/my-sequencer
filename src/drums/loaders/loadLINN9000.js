@@ -13,7 +13,6 @@ import {loadSample} from "../loadSample.js";
 let LINN9000Cache
 
 export async function loadLINN9000(audioContext) {
-  console.log('loading LINN 9000')
   if (LINN9000Cache) { return LINN9000Cache; }
 
   const [

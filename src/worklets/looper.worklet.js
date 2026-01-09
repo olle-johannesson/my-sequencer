@@ -1,5 +1,3 @@
-// in looper.worklet.js
-
 class Looper extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [
