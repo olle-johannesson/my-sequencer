@@ -1,6 +1,18 @@
 import {makeDriveCurve} from "../util/driveCurve.js";
 
 export const presets = {
+  distort: {
+    filter: {
+      type: 'lowpass',
+      Q: 0.7,
+      baseHz: 8000,  // Static high cutoff
+      depthHz: 0,     // No modulation - pure distortion
+      rateHz: 0.1,
+    },
+    drive: { amount: 0.85 },  // Heavy drive for aggressive distortion
+    outGain: 1.0,
+  },
+
   bandDrift: {
     filter: {
       type: 'bandpass',

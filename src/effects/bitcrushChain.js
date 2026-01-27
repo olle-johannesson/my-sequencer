@@ -4,6 +4,11 @@ export const presets = {
     postLPF: { enabled: true, hz: 9000, Q: 0.7 },
     outGain: 1.0,
   },
+  lofi: {
+    crush: { bitDepth: 12, rateReduction: 0.15 },  // Low sample rate, high bit depth
+    postLPF: { enabled: true, hz: 6000, Q: 0.7 },
+    outGain: 1.1,
+  },
   meltdown: {
     crush: { bitDepthStart: 12, bitDepthEnd: 3, rrStart: 1.0, rrEnd: 0.08, dur: 0.15 },
     postLPF: { enabled: true, hz: 7000, Q: 0.7 },

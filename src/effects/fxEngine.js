@@ -8,9 +8,11 @@ import {bpm} from "../looper.js";
 
 export const allPresets = {
   crunch: { chain: 'bitcrush', preset: bitcrushPresets.crunch },
+  lofi: { chain: 'bitcrush', preset: bitcrushPresets.lofi },
   meltdown: { chain: 'bitcrush', preset: bitcrushPresets.meltdown },
   dub: { chain: 'delay', preset: delayPresets.dub },
   slapback: { chain: 'delay', preset: delayPresets.slapback },
+  distort: { chain: 'filterDrive', preset: filterDrivePresets.distort },
   lpWobble: { chain: 'filterDrive', preset: filterDrivePresets.lpWobble },
   bandDrift: { chain: 'filterDrive', preset: filterDrivePresets.bandDrift },
   stutter16: { chain: 'gate', preset: () => gatePresets.stutter16(bpm) },
