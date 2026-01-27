@@ -62,8 +62,6 @@ export function createReverbChain(audioCtx) {
   function applyPreset(p, t) {
     const ramp = Math.max(0.001, (p.rampMs ?? 40) / 1000);
 
-    console.log(t, ramp)
-
     tone.frequency.setValueAtTime(p.toneLPFHz ?? 1000, t);
     tone.frequency.linearRampToValueAtTime(p.toneLPFHz ?? 1000, t + ramp);
 

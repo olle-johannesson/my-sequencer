@@ -11,6 +11,7 @@ import {setupEffectButtons} from "./effects/effectsController.js";
 const LOADER_CLASS = 'loader';
 const DISCO_CLASS = 'disco';
 const btn = document.getElementById('hold');
+const audioToggle = document.getElementById('audio-toggle');
 const analysisBlockSize = 1024;
 const spectrumSize = analysisBlockSize / 2;
 
@@ -142,7 +143,6 @@ async function start() {
   await ensureMagentaIsLoaded();
   await startLoop();
   btn.classList.add(DISCO_CLASS);
-  btn.addEventListener('click', stop, { once: true });
 }
 
 async function stop() {
@@ -151,7 +151,27 @@ async function stop() {
   }
   clearAllSamples();
   btn.classList.remove(DISCO_CLASS);
-  btn.addEventListener('click', start, { once: true });
 }
 
-btn.addEventListener('click', start, { once: true })
+// Update button position for ripple effect
+function updateButtonPosition() {
+  const rect = btn.getBoundingClientRect();
+  const x = rect.left + rect.width / 2;
+  const y = rect.top + rect.height / 2;
+  document.documentElement.style.setProperty('--ripple-x', `${x}px`);
+  document.documentElement.style.setProperty('--ripple-y', `${y}px`);
+}
+
+// Listen to checkbox state changes
+audioToggle.addEventListener('change', async (e) => {
+  updateButtonPosition();
+  if (e.target.checked) {
+    await start();
+  } else {
+    await stop();
+  }
+});
+
+// Update position on resize
+window.addEventListener('resize', updateButtonPosition);
+updateButtonPosition();

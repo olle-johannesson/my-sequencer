@@ -4,6 +4,11 @@
     --ripple-inner: #FF4136;
     --ripple-outer: #FFB700;
     --ripple-speed: .5s;
+    --bg-color-start: #FFB700;
+    --bg-color-end: #FFE720;
+
+    --ripple-y: 0;
+    --ripple-x: 0;
 }
 
 html {
@@ -19,9 +24,36 @@ html, body {
     justify-content: space-around;
     align-items: center;
     flex-direction: column;
+    position: relative;
+    overflow: hidden;
 }
 
-button {
+/* Radial gradient overlay - pure CSS driven by checkbox state */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: -1;
+    background: linear-gradient(135deg, var(--bg-color-start) 0%, var(--bg-color-end) 100%);
+    clip-path: circle(0px at var(--ripple-x) var(--ripple-y));
+    transition: clip-path .5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* When checkbox is checked, expand the color background */
+body:has(#audio-toggle:checked)::before {
+    clip-path: circle(200vmax at var(--ripple-x) var(--ripple-y));
+}
+
+html:has(#audio-toggle:checked) {
+    animation: disco-color-rotation2 1200s linear infinite;
+}
+
+
+button, #hold {
     min-width: 100px;
     min-height: 100px;
     font-size: 1.2rem;
@@ -36,6 +68,9 @@ button {
                 box-shadow       .25s ease-in-out,
                 transform       0.15s ease-out;
     box-shadow: 0 0 var(--shadow-width) var(--button-color);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 #fx {
@@ -64,31 +99,34 @@ button {
     transform: scale(0.975);
 }
 
-button {
+label#hold {
+    padding: 1.5em;
+    aspect-ratio: 1;
     --button-color: #333333;
 }
 
-button:hover {
+label#hold:hover {
     transform: scale(1.05);
     --button-color: #FFB700;
 }
 
-button.disco {
+label#hold.disco {
     --button-color: lightgreen;
 }
 
-button:active {
+label#hold:active {
     transform: scale(0.9);
     box-shadow: 0 0 calc(var(--shadow-width) / 2) var(--button-color);
 }
 
-button svg {
-    width: 2.5em;
-    height: 2.5em;
+label svg {
+    width: 100%;
+    height: 100%;
+    margin-bottom: 20%;
     display: inline-block;
 }
 
-button .ripple-circles {
+label .ripple-circles {
     z-index: 2;
     width: 100%;
     height: 100%;
@@ -99,7 +137,7 @@ button .ripple-circles {
     pointer-events: none;
 }
 
-button .ripple-circle {
+label .ripple-circle {
     border-radius: 50%;
     height: 100%;
     width: 100%;
@@ -117,7 +155,7 @@ button .ripple-circle {
     animation: none;
 }
 
-button.recording .ripple-circle {
+label.recording .ripple-circle {
     animation: growAndFade var(--ripple-speed) infinite ease-out;
 }
 
@@ -143,7 +181,7 @@ button.recording .ripple-circle {
     opacity: 0;
 }
 
-button:hover>.mic-star, button:focus>.mic-star, .disco>.mic-star {
+label:hover>.mic-star, label:focus>.mic-star, .disco>.mic-star {
     position: absolute;
     width: 16px;
     height: 16px;
