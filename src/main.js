@@ -1,18 +1,20 @@
-import {bpm, clearAllSamples, clearSample, rndBpm, scheduler, scheduleSample, startRepeat, stopRepeat} from "./looper.js";
+import {clearAllSamples, clearSample, rndBpm, scheduler, scheduleSample} from "./looper.js";
 import {audioBufferFromSAB} from "./dsp/audioBufferFromFloatArray.js";
 import {loadRandomDrums} from "./drums/loadRandomDrums.js";
 import {FEATURE_COUNT} from "./util/mailbox.js";
 import {continuePattern, initMagenta, magentaIsReady} from "./magentaHelper.js";
 import {PITCH_TO_DRUM} from "./drums/drumNameMaps.js";
-import {aConservativeSeed, addNewRecordedSample} from './pattern.js'
-import {allPresets, createFxEngine} from "./effects/fxEngine.js";
+import {aConservativeSeed, addNewRecordedSample} from './pattern.js';
+import {setupAudioContext, setupMicrophoneChain, setupMasterChain, createPeakMeter} from "./audio/audioSetup.js";
+import {setupEffectButtons} from "./effects/effectsController.js";
 
 const LOADER_CLASS = 'loader';
 const DISCO_CLASS = 'disco';
 const btn = document.getElementById('hold');
-const analysisBlockSize = 1024
-const spectrumSize = analysisBlockSize / 2
-let audioContext, stream, microphoneInput, recorder, isPlaying = false;
+const analysisBlockSize = 1024;
+const spectrumSize = analysisBlockSize / 2;
+
+let audioContext, recorder;
 
 // init worker threads
 const analysisWorker = new Worker(new URL('./workers/analysis.worker.js', import.meta.url), {type: 'module'});
@@ -33,38 +35,13 @@ const noiseSpectrumSAB = new SharedArrayBuffer(
 );
 
 
-async function ensureAudioContextIsRunning() {
-  if (audioContext) {
-    if (audioContext.state === 'suspended') {
-      await audioContext.resume();
-    }
-  } else {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)({
-      latencyHint: 'interactive'
-    });
-  }
-}
-
 async function startLoop() {
-  rndBpm()
-  await audioContext.audioWorklet.addModule('/src/worklets/tap.worklet.js');
-  await audioContext.audioWorklet.addModule('/src/worklets/analysis-reader.worklet.js');
-  await audioContext.audioWorklet.addModule('/src/worklets/recorder.worklet.js');
-  await audioContext.audioWorklet.addModule('/src/worklets/bitcrusher.worklet.js');
-  await audioContext.audioWorklet.addModule('/src/worklets/grain-player.worklet.js');
-  await audioContext.audioWorklet.addModule('/src/worklets/pitchshift.worklet.js');
+  rndBpm();
 
-  stream = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      channelCount: 1,
-      echoCancellation: true,
-      noiseSuppression: false,
-      autoGainControl: false,
-    }
-  });
+  // Setup audio context and worklets
+  audioContext = await setupAudioContext(analysisBlockSize, spectrumSize, audioFeatureSAB);
 
-  microphoneInput = new MediaStreamAudioSourceNode(audioContext, {mediaStream: stream});
-
+  // Initialize workers
   analysisWorker.postMessage({
     type: 'init',
     featureMailboxSAB: audioFeatureSAB,
@@ -80,138 +57,61 @@ async function startLoop() {
     spectrumSize
   });
 
-  recorder = new AudioWorkletNode(audioContext, 'recorder');
+  // Setup microphone input chain
+  const {tap, recorder: recorderNode} = await setupMicrophoneChain(
+    audioContext,
+    analysisBlockSize,
+    spectrumSize,
+    audioFeatureSAB
+  );
+  recorder = recorderNode;
+
+  // Setup recorder callbacks
   recorder.port.onmessage = e => {
     switch (e.data.type) {
-      case 'audio': {
+      case 'audio':
         postProcessWorker.postMessage({
           samples: e.data.audio,
           sampleRate: audioContext.sampleRate
         });
         break;
-      }
-      case 'rec begin': {
+      case 'rec begin':
         btn.classList.add('recording');
         break;
-      }
-      case 'rec end': {
-        btn.classList.remove('recording')
+      case 'rec end':
+        btn.classList.remove('recording');
         break;
-      }
     }
-  }
+  };
 
-  const tap = new AudioWorkletNode(audioContext, 'tap-node', {
-    processorOptions: {blockSize: analysisBlockSize, downsample: 1},
-    parameterData: {passthrough: 1}
-  });
-
+  // Setup analysis tap
   tap.port.onmessage = (e) => {
     const chunk = new Float32Array(e.data.audio);
     analysisWorker.postMessage({type: 'data', audio: chunk}, [chunk.buffer]);
   };
 
-  const analysisReader = new AudioWorkletNode(audioContext, 'analysis-reader', {
-    numberOfInputs: 0,
-    numberOfOutputs: 3,
-    outputChannelCount: [1, 1, 1],
-    processorOptions: {
-      mailboxSAB: audioFeatureSAB,
-      featureCount: FEATURE_COUNT
-    },
-  });
+  // Setup master output chain
+  const {masterGain, outputAnalyser} = setupMasterChain(audioContext, spectrumSize);
 
-  const delay = audioContext.createDelay(1.0);
-  delay.delayTime.value = 0.01;
+  // Setup effect buttons
+  setupEffectButtons(audioContext, masterGain, outputAnalyser);
 
-  const hp = audioContext.createBiquadFilter();
-  hp.type = 'highpass';
-  hp.frequency.value = 80
+  // Setup peak meter
+  const updateMeter = createPeakMeter(outputAnalyser);
+  updateMeter();
 
-  const comp = audioContext.createDynamicsCompressor();
-  comp.threshold.value = -18;
-  comp.knee.value = 24;
-  comp.ratio.value = 3;
-  comp.attack.value = 0.005;
-  comp.release.value = 0.2;
-
-  const recordGain = audioContext.createGain();
-  recordGain.gain.value = 0.8;
-
-  const masterGain = audioContext.createGain()
-  masterGain.gain.value = 0.25;
-
-  const outputAnalyser = audioContext.createAnalyser();
-  outputAnalyser.fftSize = spectrumSize * 2;
-  const buffer = new Float32Array(outputAnalyser.fftSize);
-
-  microphoneInput
-    .connect(tap)
-    .connect(delay)
-    .connect(hp)
-    .connect(comp)
-    .connect(recordGain)
-    .connect(recorder)
-
-  const recordParam = recorder.parameters.get('record');
-  analysisReader.connect(recordParam, 0);
-  analysisReader.connect(hp.frequency, 1);
-  analysisReader.connect(recordGain.gain, 2);
-
-  masterGain
-    .connect(outputAnalyser)
-    .connect(audioContext.destination);
-
-  const fxEngine = createFxEngine(audioContext)
-  document.getElementById("fx").querySelectorAll("button").forEach(btn => {
-    // Handle repeat buttons differently - they retrigger samples, not master bus effects
-    if (btn.id === 'repeat1' || btn.id === 'repeat2') {
-      const subdivision = btn.id === 'repeat1' ? 2 : 2.5;
-      btn.addEventListener('pointerdown', () => {
-        startRepeat(subdivision);
-      })
-      btn.addEventListener('pointerup', () => {
-        stopRepeat();
-      })
-    } else {
-      // Regular effects (reverse, delay, etc.) go through fxEngine
-      btn.addEventListener('pointerdown', () => {
-        masterGain.disconnect(outputAnalyser)
-        const preset = allPresets[btn.id]
-        fxEngine.activate(preset.chain, preset.preset, audioContext.currentTime, masterGain, outputAnalyser)
-      })
-      btn.addEventListener('pointerup', () => {
-        fxEngine.deactivate()
-        masterGain.connect(outputAnalyser)
-      })
-    }
-  })
-
-
-  function measurePeakVolume() {
-    outputAnalyser.getFloatTimeDomainData(buffer);
-    return Math.max(...buffer.map(v => Math.abs(v)));
-  }
-
-  const documentRoot = document.querySelector(':root');
-
-  function updateMeter() {
-    let measured = 300 * measurePeakVolume()
-    documentRoot.style.setProperty('--shadow-width', `${measured}em`);
-    requestAnimationFrame(updateMeter);
-  }
-
+  // Load drums and start pattern
   const drumSamples = await loadRandomDrums(audioContext);
   continuePattern(aConservativeSeed, 1.3).then(p => {
     p.notes
       .map(note => ({ drum: PITCH_TO_DRUM[note.pitch], onset: note.quantizedStartStep }))
       .filter(n => n.drum)
       .map(n => ({...n, drum: drumSamples[n.drum]}))
-      .forEach(({drum, onset}) => scheduleSample(onset, drum))
-  })
+      .forEach(({drum, onset}) => scheduleSample(onset, drum));
+  });
 
-  updateMeter()
-  scheduler(audioContext, masterGain)
+  // Start scheduler
+  scheduler(audioContext, masterGain);
 }
 
 
@@ -239,18 +139,19 @@ async function ensureMagentaIsLoaded() {
 }
 
 async function start() {
-  await ensureAudioContextIsRunning()
-  await ensureMagentaIsLoaded()
-  await startLoop()
+  await ensureMagentaIsLoaded();
+  await startLoop();
   btn.classList.add(DISCO_CLASS);
-  btn.addEventListener('click', stop, { once: true })
+  btn.addEventListener('click', stop, { once: true });
 }
 
 async function stop() {
-  await audioContext.suspend()
-  clearAllSamples()
+  if (audioContext && audioContext.state !== 'suspended') {
+    await audioContext.suspend();
+  }
+  clearAllSamples();
   btn.classList.remove(DISCO_CLASS);
-  btn.addEventListener('click', start, { once: true })
+  btn.addEventListener('click', start, { once: true });
 }
 
 btn.addEventListener('click', start, { once: true })
