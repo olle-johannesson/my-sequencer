@@ -1,4 +1,4 @@
-import {bpm, clearAllSamples, clearSample, rndBpm, scheduler, scheduleSample} from "./looper.js";
+import {bpm, clearAllSamples, clearSample, rndBpm, scheduler, scheduleSample, startRepeat, stopRepeat} from "./looper.js";
 import {audioBufferFromSAB} from "./dsp/audioBufferFromFloatArray.js";
 import {loadRandomDrums} from "./drums/loadRandomDrums.js";
 import {FEATURE_COUNT} from "./util/mailbox.js";
@@ -163,15 +163,27 @@ async function startLoop() {
 
   const fxEngine = createFxEngine(audioContext)
   document.getElementById("fx").querySelectorAll("button").forEach(btn => {
-    btn.addEventListener('pointerdown', () => {
-      masterGain.disconnect(outputAnalyser)
-      const preset = allPresets[btn.id]
-      fxEngine.activate(preset.chain, preset.preset, audioContext.currentTime, masterGain, outputAnalyser)
-    })
-    btn.addEventListener('pointerup', () => {
-      fxEngine.deactivate()
-      masterGain.connect(outputAnalyser)
-    })
+    // Handle repeat buttons differently - they retrigger samples, not master bus effects
+    if (btn.id === 'repeat1' || btn.id === 'repeat2') {
+      const subdivision = btn.id === 'repeat1' ? 2 : 2.5;
+      btn.addEventListener('pointerdown', () => {
+        startRepeat(subdivision);
+      })
+      btn.addEventListener('pointerup', () => {
+        stopRepeat();
+      })
+    } else {
+      // Regular effects (reverse, delay, etc.) go through fxEngine
+      btn.addEventListener('pointerdown', () => {
+        masterGain.disconnect(outputAnalyser)
+        const preset = allPresets[btn.id]
+        fxEngine.activate(preset.chain, preset.preset, audioContext.currentTime, masterGain, outputAnalyser)
+      })
+      btn.addEventListener('pointerup', () => {
+        fxEngine.deactivate()
+        masterGain.connect(outputAnalyser)
+      })
+    }
   })
 
 

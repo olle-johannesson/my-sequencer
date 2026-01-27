@@ -41,8 +41,8 @@ export const presets = {
     const eighthMs = bpmToMs(bpm, 2);  // 1/8 note
     return {
       wet: 1.0,
-      windowMs: Math.min(200, eighthMs),
-      repeatMs: eighthMs,
+      windowMs: 175,
+      repeatMs: 175,
       jitterMs: 0,
       reverse: 1,
       rampMs: 8,

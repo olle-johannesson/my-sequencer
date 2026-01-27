@@ -15,8 +15,6 @@ export const allPresets = {
   bandDrift: { chain: 'filterDrive', preset: filterDrivePresets.bandDrift },
   stutter16: { chain: 'gate', preset: () => gatePresets.stutter16(bpm) },
   tripletish: { chain: 'gate', preset: () => gatePresets.tripletish(bpm) },
-  repeat1: { chain: 'grain', preset: () => grainPresets.repeat1(bpm) },
-  repeat2: { chain: 'grain', preset: () => grainPresets.repeat2(bpm) },
   reverse: { chain: 'grain', preset: () => grainPresets.reverse(bpm) },
   medium: { chain: 'reverb', preset: reverbPresets.medium },
   small: { chain: 'reverb', preset: reverbPresets.small }

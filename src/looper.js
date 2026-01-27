@@ -10,6 +10,10 @@ let currentStep = 0
 let nextStepTime = undefined
 let scheduledSamples = [...new Array(16)].map(() => new Set())
 let scheduledFx = [...new Array(16)].map(() => null);
+let repeatState = {
+  active: false,
+  subdivision: 2
+};
 
 const currentlyPlaying = new Map()
 const stepsPerBeat = 4;
@@ -94,16 +98,32 @@ export function scheduler(audioContext, outputNode) {
     const stepSamples = scheduledSamples[currentStep] ?? new Set()
     const stepVelocity = velocityByStep[currentStep % velocityByStep.length] ?? 1;
 
-    Array.from(stepSamples)
+    const samplesToPlay = Array.from(stepSamples)
       .filter(Boolean)
       .map(thunk)
-      .filter(f => f instanceof AudioBuffer)
-      .forEach(sample => {
-        const humanFactor = getNormallyDistributedNumber(0, 0.05);
-        const gain = baseGain * stepVelocity + humanFactor;
-        // const outputToUse = scheduledEffect ? g : outputNode
-        playSampleAt(audioContext, sample, nextStepTime, gain, outputNode)
-      })
+      .filter(f => f instanceof AudioBuffer);
+
+    samplesToPlay.forEach(sample => {
+      const humanFactor = getNormallyDistributedNumber(0, 0.05);
+      const gain = baseGain * stepVelocity + humanFactor;
+
+      // Play the sample normally
+      playSampleAt(audioContext, sample, nextStepTime, gain, outputNode)
+
+      // If repeat is active, schedule additional rapid-fire plays
+      if (repeatState.active) {
+        const repeatInterval = calculateStepDuration() / repeatState.subdivision;
+        const timeUntilNextStep = nextStepTime - audioContext?.currentTime
+
+        // Schedule repeats until the next step
+        let repeatTime = nextStepTime + repeatInterval;
+
+        while (repeatTime < nextStepTime + calculateStepDuration()) {
+          playSampleAt(audioContext, sample, repeatTime, baseGain * 0.8, outputNode);
+          repeatTime += repeatInterval;
+        }
+      }
+    })
 
     // if (currentStep === 0) {
     // //   continueEffectPattern((i, p) => scheduleFx(i, allPresets[p]), clearAllFx)
@@ -136,7 +156,13 @@ function stopWithFade(audioContext, bufferSource, gainNode, fadeMs = 5) {
 
 function playSampleAt(audioContext, sample, time, gain = 1, outputNode) {
   if (!sample) return;
-  if (currentlyPlaying.has(sample)) {
+
+  // Only stop currently playing if we're scheduling for immediate playback
+  // (within 50ms). For future scheduling (repeats), allow polyphonic playback.
+  const now = audioContext.currentTime;
+  const isImmediate = (time - now) < 0.05;
+
+  if (isImmediate && currentlyPlaying.has(sample)) {
     try {
       const { bufferSource, gainNode } = currentlyPlaying.get(sample)
       stopWithFade(audioContext, bufferSource, gainNode)
@@ -154,7 +180,27 @@ function playSampleAt(audioContext, sample, time, gain = 1, outputNode) {
   gainNode.connect(outputNode);
 
   bufferSource.start(time);
-  currentlyPlaying.set(sample, { bufferSource, gainNode })
+
+  // Only track as "currently playing" if it's immediate
+  if (isImmediate) {
+    currentlyPlaying.set(sample, { bufferSource, gainNode })
+  }
+}
+
+/**
+ * Start repeating scheduled samples at a given subdivision
+ * @param subdivision {number} - BPM subdivision (8 = 32nd notes, 16 = 16th, 2 = 8th, 1 = quarter)
+ */
+export function startRepeat(subdivision) {
+  repeatState.active = true;
+  repeatState.subdivision = subdivision;
+}
+
+/**
+ * Stop repeating
+ */
+export function stopRepeat() {
+  repeatState.active = false;
 }
 
 
