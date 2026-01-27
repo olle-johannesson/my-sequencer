@@ -52,6 +52,7 @@ async function startLoop() {
   await audioContext.audioWorklet.addModule('/src/worklets/recorder.worklet.js');
   await audioContext.audioWorklet.addModule('/src/worklets/bitcrusher.worklet.js');
   await audioContext.audioWorklet.addModule('/src/worklets/grain-player.worklet.js');
+  await audioContext.audioWorklet.addModule('/src/worklets/pitchshift.worklet.js');
 
   stream = await navigator.mediaDevices.getUserMedia({
     audio: {

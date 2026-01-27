@@ -5,6 +5,7 @@ export const presets = {
     fbLPFHz: 7000,
     wet: 0.28,
     wetRampMs: 15,
+    lfo: { rate: 0, depth: 0 }
   },
 
   dub: {
@@ -13,14 +14,27 @@ export const presets = {
     fbLPFHz: 3200,
     wet: 0.45,
     wetRampMs: 15,
+    lfo: { rate: 0, depth: 0 }
   },
 
-  selfOsc: {
-    delayTime: 0.24,
-    feedback: 0.84,
-    fbLPFHz: 2500,
-    wet: 0.55,
-    wetRampMs: 10,
+  semitoneUp: {
+    delayTime: 0.02,    // Short delay for pitch shift
+    feedback: 0.0,       // No feedback
+    fbLPFHz: 12000,
+    wet: 1.0,            // 100% wet
+    dry: 0.1,
+    wetRampMs: 5,
+    lfo: { rate: 6, depth: 0.003 }  // Modulate delay time for pitch effect
+  },
+
+  semitoneDown: {
+    delayTime: 0.115,    // Even shorter delay
+    feedback: 0.0,
+    fbLPFHz: 12000,
+    wet: 1.0,
+    dry: 0.1,
+    wetRampMs: 5,
+    lfo: { rate: 12, depth: 0.006 }  // Faster & deeper modulation
   },
 };
 
@@ -34,6 +48,14 @@ export function createDelayChain(audioCtx) {
   const fbGain = audioCtx.createGain();
   const fbFilter = audioCtx.createBiquadFilter();
   fbFilter.type = "lowpass";
+
+  // LFO for delay time modulation (pitch shifting)
+  const lfo = audioCtx.createOscillator();
+  const lfoGain = audioCtx.createGain();
+  lfo.type = 'sine';
+  lfo.frequency.value = 0;
+  lfoGain.gain.value = 0;
+  lfo.connect(lfoGain).connect(delay.delayTime);
 
   // dry path
   input.connect(dry).connect(output);
@@ -52,19 +74,36 @@ export function createDelayChain(audioCtx) {
   fbFilter.frequency.value = 4000;
   output.gain.value = 1.0;
 
+  let lfoStarted = false;
   let connected = false;
   let lastIn = null;
   let lastOut = null;
 
   function applyPreset(p, t) {
+    if (!lfoStarted) {
+      lfo.start(t);
+      lfoStarted = true;
+    }
+
     const ramp = Math.max(0.001, (p.wetRampMs ?? 10) / 1000);
 
     delay.delayTime.setValueAtTime(p.delayTime ?? 0.22, t);
     fbGain.gain.setValueAtTime(p.feedback ?? 0.6, t);
     fbFilter.frequency.setValueAtTime(p.fbLPFHz ?? 4000, t);
+
+    // LFO modulation
+    lfo.frequency.setValueAtTime(p.lfo?.rate ?? 0, t);
+    lfoGain.gain.setValueAtTime(p.lfo?.depth ?? 0, t);
+
     wet.gain.cancelScheduledValues(t);
     wet.gain.setValueAtTime(wet.gain.value, t);
     wet.gain.linearRampToValueAtTime(p.wet ?? 0.4, t + ramp);
+
+    if (p.dry) {
+      dry.gain.cancelScheduledValues(t);
+      dry.gain.setValueAtTime(dry.gain.value, t);
+      dry.gain.linearRampToValueAtTime(p.dry ?? 0.4, t + ramp);
+    }
   }
 
   function connect(config = {}) {

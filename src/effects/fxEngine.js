@@ -4,6 +4,7 @@ import {createFilterDriveChain, presets as filterDrivePresets} from "./filterDri
 import {createGateChain, presets as gatePresets} from "./gateChain.js";
 import {createGrainChain, presets as grainPresets} from "./grainChain.js";
 import {createReverbChain, presets as reverbPresets} from "./reverbChain.js";
+import {createPitchChain, presets as pitchPresets} from "./pitchChain.js";
 import {bpm} from "../looper.js";
 
 export const allPresets = {
@@ -18,6 +19,9 @@ export const allPresets = {
   stutter16: { chain: 'gate', preset: () => gatePresets.stutter16(bpm) },
   tripletish: { chain: 'gate', preset: () => gatePresets.tripletish(bpm) },
   reverse: { chain: 'grain', preset: () => grainPresets.reverse(bpm) },
+  semitoneUp: { chain: 'pitch', preset: pitchPresets.semitoneUp },
+  semitoneDown: { chain: 'pitch', preset: pitchPresets.semitoneDown },
+  vibrato: { chain: 'delay', preset: delayPresets.semitoneUp },
   medium: { chain: 'reverb', preset: reverbPresets.medium },
   small: { chain: 'reverb', preset: reverbPresets.small }
 }
@@ -29,6 +33,7 @@ export function createFxEngine(audioCtx) {
     filterDrive: createFilterDriveChain(audioCtx),
     gate: createGateChain(audioCtx),
     grain: createGrainChain(audioCtx),
+    pitch: createPitchChain(audioCtx),
     reverb: createReverbChain(audioCtx)
   }
   let active = null;
