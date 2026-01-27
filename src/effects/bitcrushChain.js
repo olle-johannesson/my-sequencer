@@ -20,15 +20,23 @@ export function createBitcrushChain(audioCtx) {
   const input = audioCtx.createGain();
   const bitcrusher = new AudioWorkletNode(audioCtx, 'bitcrusher', {
     parameterData: { bitDepth: 8, rateReduction: 0.5 },
+    numberOfInputs: 1,
+    numberOfOutputs: 1,
+    channelCount: 2,
+    channelCountMode: 'max',
   });
 
   const postFilter = audioCtx.createBiquadFilter();
   postFilter.type = 'lowpass';
   postFilter.frequency.value = 12000;
   postFilter.Q.value = 0.7;
+  postFilter.channelCount = 2;
+  postFilter.channelCountMode = 'max';
 
   const output = audioCtx.createGain();
   output.gain.value = 1.0;
+  output.channelCount = 2;
+  output.channelCountMode = 'max';
 
   input.connect(bitcrusher);
   bitcrusher.connect(postFilter);
@@ -90,14 +98,18 @@ export function createBitcrushChain(audioCtx) {
 
   function disconnect(t = audioCtx.currentTime) {
     if (!connected) return;
+
+    // Reset to bypass state
+    pBitDepth.cancelScheduledValues(t);
+    pBitDepth.setValueAtTime(16, t);  // Max bit depth = clean
+    pRR.cancelScheduledValues(t);
+    pRR.setValueAtTime(1.0, t);  // Full rate = clean
+
     try { lastIn.disconnect(input); } catch {}
     try { output.disconnect(lastOut); } catch {}
     connected = false;
     lastIn = null;
     lastOut = null;
-
-    pBitDepth.cancelScheduledValues(t);
-    pRR.cancelScheduledValues(t);
   }
 
   return {

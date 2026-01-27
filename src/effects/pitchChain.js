@@ -15,8 +15,17 @@ export function createPitchChain(audioCtx) {
   const input = audioCtx.createGain();
   const pitchShifter = new AudioWorkletNode(audioCtx, "pitchshift", {
     parameterData: { wet: 1.0, pitchRatio: 1.0 },
+    numberOfInputs: 1,
+    numberOfOutputs: 1,
+    channelCount: 2,
+    channelCountMode: 'max',
   });
   const output = audioCtx.createGain();
+
+  input.channelCount = 2;
+  input.channelCountMode = 'max';
+  output.channelCount = 2;
+  output.channelCountMode = 'max';
 
   input.connect(pitchShifter).connect(output);
 

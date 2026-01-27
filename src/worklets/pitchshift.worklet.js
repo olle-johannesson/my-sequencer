@@ -9,65 +9,75 @@ class PitchShiftProcessor extends AudioWorkletProcessor {
 
   constructor() {
     super();
-    // Delay line buffer
+    // Delay line buffer per channel
     this.bufferSize = 16384;
-    this.buffer = new Float32Array(this.bufferSize);
-    this.writePos = 0;
-
-    // Read head with fractional position
-    this.readPos = 0;
-    this.initialized = false;
+    this.buffers = [
+      new Float32Array(this.bufferSize),
+      new Float32Array(this.bufferSize)
+    ];
+    this.writePos = [0, 0];
+    this.readPos = [0, 0];
+    this.initialized = [false, false];
   }
 
   // Linear interpolation
-  readSample(pos) {
+  readSample(buffer, pos) {
     const idx = Math.floor(pos) % this.bufferSize;
     const nextIdx = (idx + 1) % this.bufferSize;
     const frac = pos - Math.floor(pos);
-    return this.buffer[idx] * (1 - frac) + this.buffer[nextIdx] * frac;
+    return buffer[idx] * (1 - frac) + buffer[nextIdx] * frac;
   }
 
   process(inputs, outputs, params) {
-    const input = inputs[0]?.[0];
-    const output = outputs[0]?.[0];
-    if (!output) return true;
+    const input = inputs[0];
+    const output = outputs[0];
+    if (!output || !output[0]) return true;
 
     const wet = params.wet[0];
     const pitchRatio = params.pitchRatio[0];
 
-    if (!input) {
-      output.fill(0);
+    if (!input || !input[0]) {
+      for (let ch = 0; ch < output.length; ch++) {
+        output[ch].fill(0);
+      }
       return true;
     }
 
-    // Write input
-    for (let i = 0; i < input.length; i++) {
-      this.buffer[this.writePos] = input[i];
-      this.writePos = (this.writePos + 1) % this.bufferSize;
-    }
+    // Process each channel
+    for (let ch = 0; ch < output.length; ch++) {
+      const inCh = input[ch] || input[0];  // Fallback to channel 0 if mono
+      const outCh = output[ch];
+      const buffer = this.buffers[ch];
 
-    // Initialize read position behind write position
-    if (!this.initialized) {
-      this.readPos = (this.writePos - 4096 + this.bufferSize) % this.bufferSize;
-      this.initialized = true;
-    }
-
-    // Simple pitch shifting by reading at different speed
-    for (let i = 0; i < output.length; i++) {
-      output[i] = this.readSample(this.readPos) * wet;
-
-      // Advance read position at pitchRatio speed
-      this.readPos += pitchRatio;
-
-      // Wrap read position
-      if (this.readPos >= this.bufferSize) {
-        this.readPos -= this.bufferSize;
+      // Write input
+      for (let i = 0; i < inCh.length; i++) {
+        buffer[this.writePos[ch]] = inCh[i];
+        this.writePos[ch] = (this.writePos[ch] + 1) % this.bufferSize;
       }
 
-      // Don't let read catch up to write
-      const distance = (this.writePos - this.readPos + this.bufferSize) % this.bufferSize;
-      if (distance < 1024) {
-        this.readPos = (this.writePos - 4096 + this.bufferSize) % this.bufferSize;
+      // Initialize read position behind write position
+      if (!this.initialized[ch]) {
+        this.readPos[ch] = (this.writePos[ch] - 4096 + this.bufferSize) % this.bufferSize;
+        this.initialized[ch] = true;
+      }
+
+      // Simple pitch shifting by reading at different speed
+      for (let i = 0; i < outCh.length; i++) {
+        outCh[i] = this.readSample(buffer, this.readPos[ch]) * wet;
+
+        // Advance read position at pitchRatio speed
+        this.readPos[ch] += pitchRatio;
+
+        // Wrap read position
+        if (this.readPos[ch] >= this.bufferSize) {
+          this.readPos[ch] -= this.bufferSize;
+        }
+
+        // Don't let read catch up to write
+        const distance = (this.writePos[ch] - this.readPos[ch] + this.bufferSize) % this.bufferSize;
+        if (distance < 1024) {
+          this.readPos[ch] = (this.writePos[ch] - 4096 + this.bufferSize) % this.bufferSize;
+        }
       }
     }
 

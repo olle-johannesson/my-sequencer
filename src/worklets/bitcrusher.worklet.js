@@ -7,28 +7,31 @@ class BitcrusherProcessor extends AudioWorkletProcessor {
   }
   constructor() {
     super();
-    this.phase = 0;
-    this.last = 0;
+    this.phase = [0, 0];  // Separate phase for each channel
+    this.last = [0, 0];   // Separate last sample for each channel
   }
   process(inputs, outputs, parameters) {
     const input = inputs[0];
     const output = outputs[0];
     if (!input[0]) return true;
 
-    const inCh = input[0];
-    const outCh = output[0];
     const bitDepth = parameters.bitDepth;
     const rateReduction = parameters.rateReduction;
-
     const step = Math.pow(0.5, bitDepth[0] || 4);
 
-    for (let i = 0; i < inCh.length; i++) {
-      this.phase += rateReduction[0] || 0.5;
-      if (this.phase >= 1.0) {
-        this.phase -= 1.0;
-        this.last = Math.round(inCh[i] / step) * step;
+    // Process all channels
+    for (let ch = 0; ch < output.length; ch++) {
+      const inCh = input[ch] || input[0];  // Fallback to channel 0 if mono
+      const outCh = output[ch];
+
+      for (let i = 0; i < inCh.length; i++) {
+        this.phase[ch] += rateReduction[0] || 0.5;
+        if (this.phase[ch] >= 1.0) {
+          this.phase[ch] -= 1.0;
+          this.last[ch] = Math.round(inCh[i] / step) * step;
+        }
+        outCh[i] = this.last[ch];
       }
-      outCh[i] = this.last;
     }
     return true;
   }

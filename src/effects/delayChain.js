@@ -124,12 +124,25 @@ export function createDelayChain(audioCtx) {
 
   function disconnect(t = audioCtx.currentTime) {
     if (!connected) return;
-    try { lastIn.disconnect(input); } catch {}
-    try { output.disconnect(lastOut); } catch {}
-    connected = false;
-    lastIn = null;
-    lastOut = null;
+
+    // Fade out and reset
     wet.gain.cancelScheduledValues(t);
+    wet.gain.setValueAtTime(wet.gain.value, t);
+    wet.gain.linearRampToValueAtTime(0.0, t + 0.02);
+
+    // Stop LFO modulation
+    lfoGain.gain.setValueAtTime(0, t);
+
+    // Clear feedback to stop delay tails
+    fbGain.gain.setValueAtTime(0, t);
+
+    setTimeout(() => {
+      try { lastIn.disconnect(input); } catch {}
+      try { output.disconnect(lastOut); } catch {}
+      connected = false;
+      lastIn = null;
+      lastOut = null;
+    }, 25);
   }
 
   return { connect, disconnect, nodes: { input, delay, fbGain, fbFilter, dry, wet, output } };

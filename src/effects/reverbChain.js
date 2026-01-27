@@ -108,13 +108,10 @@ export function createReverbChain(audioCtx) {
   function disconnect(t = audioCtx.currentTime) {
     if (!connected) return;
 
-    // wet.gain.cancelScheduledValues(t);
-    // wet.gain.setValueAtTime(wet.gain.value, t);
-    // wet.gain.linearRampToValueAtTime(0.0, t + 0.03);
-    //
-    // dry.gain.cancelScheduledValues(t)
-    // dry.gain.setValueAtTime(1.0 - wet.gain.value + 0.3, t);
-    // dry.gain.linearRampToValueAtTime(0.0, t + 0.03);
+    // Fade out wet signal
+    wet.gain.cancelScheduledValues(t);
+    wet.gain.setValueAtTime(wet.gain.value, t);
+    wet.gain.linearRampToValueAtTime(0.0, t + 0.03);
 
     setTimeout(() => {
       try { lastIn.disconnect(input); } catch {}

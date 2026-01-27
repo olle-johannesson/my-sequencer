@@ -63,11 +63,24 @@ export function createGrainChain(audioCtx) {
     parameterData: {
       wet: 0.0,
       windowMs: 40,
-      repeatMs: 80,   // ✅ changed
+      repeatMs: 80,
       jitterMs: 0,
       reverse: 0,
     },
+    numberOfInputs: 1,
+    numberOfOutputs: 1,
+    channelCount: 2,
+    channelCountMode: 'max',
   });
+
+  input.channelCount = 2;
+  input.channelCountMode = 'max';
+  dry.channelCount = 2;
+  dry.channelCountMode = 'max';
+  wetGain.channelCount = 2;
+  wetGain.channelCountMode = 'max';
+  output.channelCount = 2;
+  output.channelCountMode = 'max';
 
   input.connect(dry).connect(output);
   input.connect(grain).connect(wetGain).connect(output);

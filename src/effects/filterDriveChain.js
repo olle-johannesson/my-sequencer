@@ -44,6 +44,16 @@ export function createFilterDriveChain(audioCtx) {
   const drive = audioCtx.createWaveShaper();
   const output = audioCtx.createGain();
 
+  // Ensure stereo passthrough
+  input.channelCount = 2;
+  input.channelCountMode = 'max';
+  filter.channelCount = 2;
+  filter.channelCountMode = 'max';
+  drive.channelCount = 2;
+  drive.channelCountMode = 'max';
+  output.channelCount = 2;
+  output.channelCountMode = 'max';
+
   // audio path
   input.connect(filter);
   filter.connect(drive);
@@ -128,6 +138,7 @@ export function createFilterDriveChain(audioCtx) {
     // reset to neutral
     filter.frequency.setValueAtTime(12000, t);
     filter.Q.setValueAtTime(1, t);
+    drive.curve = makeDriveCurve(0);  // Clean, no distortion
 
     try { lastIn.disconnect(input); } catch {}
     try { output.disconnect(lastOut); } catch {}
