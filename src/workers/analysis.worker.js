@@ -16,6 +16,7 @@ let rmsThreshold = MIN_NOISE_THRESHOLD;
 let noiseSpectrum = null;
 let noiseRms = 0;
 let recordingState = 0;
+let calibrationFrames = 0;
 
 // hysteresis:
 const START_FACTOR = 0.125;   // how far above noise to start
@@ -84,11 +85,27 @@ function postNoiseModelToMailbox() {
  */
 setInterval(postNoiseModelToMailbox, 1000)
 
+/**
+ * Deciding whether to record or not.
+ * To start recording, the rms must be higher than a set minimum (adapted
+ * by the noise level), and the spectral flux must exceed some set level.
+ *
+ * To stop recording, the rms must be below some similar threshold (adapted
+ * by the noise level), but not depend on flux. Otherwise, sustained tones might
+ * experience decreasing flux and cause false negatives. As long as we're above the
+ * noise floor, we'll assume that we're recording something interesting.
+ *
+ * This is then passed though as hysteresis gate to ramp our starts and stops.
+ *
+ * @param rms {number}
+ * @param flux {number}
+ * @return {number}
+ */
 function recordingDecision(rms, flux) {
   const startThreshold = rmsThreshold * START_FACTOR;
   const stopThreshold  = rmsThreshold * STOP_FACTOR;
   const enterCond = rms > startThreshold && flux > 0.05;
-  const exitCond  = rms < stopThreshold  || flux < 0.02;
+  const exitCond  = rms < stopThreshold //  || flux < 0.02;
   return hysteresisGate(enterCond, exitCond)
 }
 
@@ -100,7 +117,13 @@ function recordingDecision(rms, flux) {
  *    3.1) inform the decision to record or not
  *    3.2) suppress noise in the audio block in post-processing
  *
- * @param e
+ * The worker receives audio blocks using message posting. This is fine as
+ * long as we're using block sizes like 1024 and 44.1 kHz. If posting gets
+ * more frequent than the time it takes to analyze them, we'll get lag,
+ * and then we should switch to SAB ring queues or something, and that's too
+ * much work for now. Let's just keep the quality reasonably low instead.
+ *
+ * @param e {MessageEvent}
  * @returns {Promise<void>}
  */
 onmessage = async (e) => {
@@ -149,7 +172,13 @@ onmessage = async (e) => {
       spectralCentroid  = spectralCentroid  || 0;
       spectralFlatness  = spectralFlatness  || 0;
 
-      recordingState = recordingDecision(rms, spectralFlux);
+      // Calibration period: force recording off for first ~1 second to learn noise floor
+      if (calibrationFrames < 40) {
+        calibrationFrames++;
+        recordingState = 0;
+      } else {
+        recordingState = recordingDecision(rms, spectralFlux);
+      }
 
       // Make sure we're not recording before updating the noise model.
       if ((recordingState === 0) && (rms < rmsThreshold)) {
