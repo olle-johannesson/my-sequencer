@@ -4,23 +4,20 @@ import {createFilterDriveChain, presets as filterDrivePresets} from "./filterDri
 import {createGateChain, presets as gatePresets} from "./gateChain.js";
 import {createGrainChain, presets as grainPresets} from "./grainChain.js";
 import {createReverbChain, presets as reverbPresets} from "./reverbChain.js";
+import {bpm} from "../looper.js";
 
 export const allPresets = {
-  crunch: { chain: 'bitcrush', preset: bitcrushPresets.crunch },    // ok
-  meltdown: { chain: 'bitcrush', preset: bitcrushPresets.meltdown },  // ok
-  dub: { chain: 'delay', preset: delayPresets.dub },        // ok
-  slapback: { chain: 'delay', preset: delayPresets.slapback },        // ok
-  lpWobble: { chain: 'filterDrive', preset: filterDrivePresets.lpWobble },  // ok ?
-  bandDrift: { chain: 'filterDrive', preset: filterDrivePresets.bandDrift },   // ok ?
-  stutter8: { chain: 'gate', preset: gatePresets.stutter8 },            //
-  stutter16: { chain: 'gate', preset: gatePresets.stutter16 },      //
-  driftGate: { chain: 'gate', preset: gatePresets.driftGate },
-  bursty: { chain: 'gate', preset: gatePresets.bursty },
-  tripletish: { chain: 'gate', preset: gatePresets.tripletish },
-  beatRepeat: { chain: 'grain', preset: grainPresets.beatRepeat }, // 14
-  glitchStretch: { chain: 'grain', preset: grainPresets.glitchStretch },
-  reverseWindow: { chain: 'grain', preset: grainPresets.reverseWindow }, // 17
-  vinylJitter: { chain: 'grain', preset: grainPresets.vinylJitter },
+  crunch: { chain: 'bitcrush', preset: bitcrushPresets.crunch },
+  meltdown: { chain: 'bitcrush', preset: bitcrushPresets.meltdown },
+  dub: { chain: 'delay', preset: delayPresets.dub },
+  slapback: { chain: 'delay', preset: delayPresets.slapback },
+  lpWobble: { chain: 'filterDrive', preset: filterDrivePresets.lpWobble },
+  bandDrift: { chain: 'filterDrive', preset: filterDrivePresets.bandDrift },
+  stutter16: { chain: 'gate', preset: () => gatePresets.stutter16(bpm) },
+  tripletish: { chain: 'gate', preset: () => gatePresets.tripletish(bpm) },
+  repeat1: { chain: 'grain', preset: () => grainPresets.repeat1(bpm) },
+  repeat2: { chain: 'grain', preset: () => grainPresets.repeat2(bpm) },
+  reverse: { chain: 'grain', preset: () => grainPresets.reverse(bpm) },
   medium: { chain: 'reverb', preset: reverbPresets.medium },
   small: { chain: 'reverb', preset: reverbPresets.small }
 }
@@ -37,11 +34,14 @@ export function createFxEngine(audioCtx) {
   let active = null;
 
   function activate(chain, config, startTime, inputNode, outputNode) {
+    // If config is a function (BPM-dependent preset), call it to get the actual config
+    const resolvedConfig = typeof config === 'function' ? config() : config;
+
     const _config = {
-      ...config,
-      t: startTime || config.t || audioCtx.currentTime,
-      in: inputNode || config.in,
-      out: outputNode || config.out
+      ...resolvedConfig,
+      t: startTime || resolvedConfig.t || audioCtx.currentTime,
+      in: inputNode || resolvedConfig.in,
+      out: outputNode || resolvedConfig.out
     }
 
     if (active && active === chain) {
@@ -49,7 +49,7 @@ export function createFxEngine(audioCtx) {
     }
 
     if (active && active !== chain) {
-      chains[active].disconnect(t);
+      chains[active].disconnect(audioCtx.currentTime);
     }
 
     chains[chain].connect(_config);

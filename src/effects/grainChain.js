@@ -1,49 +1,54 @@
 // chains/grainChain.js
 
+// Convert BPM to milliseconds for note subdivisions
+function bpmToMs(bpm, subdivision) {
+  const beatMs = (60 / bpm) * 1000;
+  return beatMs / subdivision;
+}
+
 export const presets = {
-  // HOLD-style, musical defaults (repeat interval in ms)
-  beatRepeat: {
-    wet: 1.0,
-    windowMs: 175,
-    repeatMs: 200,   // ~8 Hz
-    jitterMs: 0,
-    reverse: 0,
-    rampMs: 8,
-    duckDry: 1.0,
-    outGain: 1.0,
+  // PO-12 style repeats - capture and loop segments (max 200ms window)
+  repeat1: (bpm) => {
+    const thirtySecondMs = bpmToMs(bpm, 8);  // 1/32 note - fast glitchy texture
+    return {
+      wet: 1.0,
+      windowMs: Math.min(200, thirtySecondMs * 0.8),
+      repeatMs: thirtySecondMs,
+      jitterMs: thirtySecondMs * 0.05,  // 5% jitter for texture
+      reverse: 0,
+      rampMs: 2,
+      duckDry: 1.0,
+      outGain: 1.1,
+    };
   },
 
-  glitchStretch: {
-    wet: 1.0,
-    windowMs: 140,
-    repeatMs: 200,   // ~5 Hz
-    jitterMs: 18,
-    reverse: 0,
-    rampMs: 10,
-    duckDry: 0.9,
-    outGain: 1.0,
+  repeat2: (bpm) => {
+    const eighthMs = bpmToMs(bpm, 2);  // 1/8 note
+    // Window is capped at 200ms but repeats at full 8th note timing
+    return {
+      wet: 1.0,
+      windowMs: Math.min(200, eighthMs),
+      repeatMs: eighthMs,
+      jitterMs: 0,
+      reverse: 0,
+      rampMs: 8,
+      duckDry: 1.0,
+      outGain: 1.0,
+    };
   },
 
-  reverseWindow: {
-    wet: 1.0,
-    windowMs: 175,
-    repeatMs: 175,   // repeat the whole window
-    jitterMs: 0,
-    reverse: 1,
-    rampMs: 8,
-    duckDry: 1.0,
-    outGain: 1.0,
-  },
-
-  vinylJitter: {
-    wet: 0.75,
-    windowMs: 12,
-    repeatMs: 42,    // ~24 Hz
-    jitterMs: 4,
-    reverse: 0,
-    rampMs: 12,
-    duckDry: 0.6,
-    outGain: 1.0,
+  reverse: (bpm) => {
+    const eighthMs = bpmToMs(bpm, 2);  // 1/8 note
+    return {
+      wet: 1.0,
+      windowMs: Math.min(200, eighthMs),
+      repeatMs: eighthMs,
+      jitterMs: 0,
+      reverse: 1,
+      rampMs: 8,
+      duckDry: 1.0,
+      outGain: 1.2,  // Boost for prominence
+    };
   },
 };
 
@@ -107,10 +112,8 @@ export function createGrainChain(audioCtx) {
   function connect(config = {}) {
     const t = config.t ?? audioCtx.currentTime;
 
-    // keeping your flexible “config-is-preset” behavior
-    const p = typeof config === "string"
-      ? presets[config]
-      : config ?? presets.beatRepeat;
+    // Config should already be resolved from fxEngine
+    const p = config;
 
     if (!connected) {
       lastIn = config.in;

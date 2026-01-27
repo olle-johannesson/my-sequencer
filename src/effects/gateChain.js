@@ -1,17 +1,27 @@
-export const presets = {
-  // classic trem/gate
-  stutter8:  { rateHz: 8.0, duty: 0.12, depth: 1.0, smoothMs: 0, outGain: 1.0 },
-  // stutter8:  { rateHz: 2.0,  duty: 0.25, depth: 1.0, smoothMs: 2, outGain: 1.0 },
-  stutter16: { rateHz: 4.0, duty: 0.20, depth: 1.0, smoothMs: 2, outGain: 1.0 },
+// Convert BPM and note subdivision to Hz
 
-  // extreme: very obviously gating
-  hardGate:  { rateHz: 7.0,  duty: 0.12, depth: 1.0, smoothMs: 1, outGain: 1.0 },
-  // more “burst” / uneven feel
-  bursty:     { rateHz: 16.0, duty: 0.35, depth: 1.0, smoothMs: 1, outGain: 1.0 },
-  // triplet-ish vibe (unsynced by default; you can tune rate)
-  tripletish: { rateHz: 9.0,  duty: 0.45, depth: 1.0, smoothMs: 2, outGain: 1.0 },
-  // PO-ish: slightly off-grid drift
-  driftGate:  { rateHz: 7.3,  duty: 0.50, depth: 1.0, smoothMs: 2, outGain: 1.0 },
+// subdivision: 1=quarter, 2=eighth, 4=sixteenth, 3=triplet, 0.5=half
+function bpmToHz(bpm, subdivision) {
+  return (bpm / 60) * subdivision;
+}
+
+export const presets = {
+  // BPM-synced stutters - crisp gating on sixteenth and eighth notes
+  stutter16: (bpm) => ({
+    rateHz: bpmToHz(bpm, 4),  // 16th notes
+    duty: 0.20,
+    depth: 1.0,
+    smoothMs: 0,
+    outGain: 1.0
+  }),
+  // triplet-ish vibe - eighth note triplets
+  tripletish: (bpm) => ({
+    rateHz: bpmToHz(bpm, 3),
+    duty: 0.45,
+    depth: 1.0,
+    smoothMs: 0,
+    outGain: 1.0
+  })
 };
 
 // helper: waveshaper that turns sine into a gate-ish square (with adjustable duty)
@@ -52,8 +62,8 @@ export function createGateChain(audioCtx) {
 
   input.connect(gate).connect(output);
   lfo.connect(shaper).connect(depth).connect(gate.gain);
-  // floor.connect(gate.gain);
-  // floor.start();
+  floor.connect(gate.gain);
+  floor.start();
   lfo.start();
 
   let connected = false;

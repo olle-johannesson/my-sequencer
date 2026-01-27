@@ -26,7 +26,6 @@ class BitcrusherProcessor extends AudioWorkletProcessor {
       this.phase += rateReduction[0] || 0.5;
       if (this.phase >= 1.0) {
         this.phase -= 1.0;
-        // quantize amplitude
         this.last = Math.round(inCh[i] / step) * step;
       }
       outCh[i] = this.last;

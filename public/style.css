@@ -32,10 +32,9 @@ button {
     color: white;
     cursor: pointer;
     position: relative;
-    /*transition: all 0.2s ease;*/
     transition: background-color .35s ease-out,
-                box-shadow .25s ease-in-out,
-                transform 0.15s ease-out;
+                box-shadow       .25s ease-in-out,
+                transform       0.15s ease-out;
     box-shadow: 0 0 var(--shadow-width) var(--button-color);
 }
 
@@ -63,7 +62,6 @@ button {
 
 #fx > button:active {
     transform: scale(0.975);
-    filter: hue-rotate(-10deg)
 }
 
 button {

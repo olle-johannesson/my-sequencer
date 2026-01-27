@@ -3,11 +3,17 @@ export const presets = {
     wet: 0.25,
     rampMs: 40,
     toneLPFHz: 8000,
+    convolutionSeconds: 0.3,
+    decay: 1.5,
+    makeupGain: 3.0,
   },
   medium: {
-    wet: 0.40,
+    wet: 0.90,
     rampMs: 60,
-    toneLPFHz: 6000,
+    toneLPFHz: 2500,
+    makeupGain: 2.0,
+    // decay: 3.0,
+    // convolutionSeconds: 1.6
   },
 };
 
@@ -40,13 +46,13 @@ export function createReverbChain(audioCtx) {
   convolver.buffer = makeIRBuffer(audioCtx, 1.2, 2.8);
 
   // wiring
-  input.connect(dry).connect(output);
+  // input.connect(dry).connect(output);
   input.connect(convolver).connect(tone).connect(wet).connect(output);
 
   // defaults
   dry.gain.value = 1.0;
   wet.gain.value = 0.0;
-  tone.frequency.value = 8000;
+  tone.frequency.value = 20_000;
   output.gain.value = 1.0;
 
   let connected = false;
@@ -56,12 +62,25 @@ export function createReverbChain(audioCtx) {
   function applyPreset(p, t) {
     const ramp = Math.max(0.001, (p.rampMs ?? 40) / 1000);
 
-    tone.frequency.setValueAtTime(p.toneLPFHz ?? 8000, t);
+    console.log(t, ramp)
 
-    // ramp FROM current wet (don’t reset)
+    tone.frequency.setValueAtTime(p.toneLPFHz ?? 1000, t);
+    tone.frequency.linearRampToValueAtTime(p.toneLPFHz ?? 1000, t + ramp);
+
+    if (p.convolutionSeconds && p.decay) {
+      convolver.buffer = makeIRBuffer(audioCtx, p.convolutionSeconds, p.decay);
+    }
+
+    output.gain.setValueAtTime(p.makeupGain ?? 1.0, t);
+
+    // ramp FROM current wet (don't reset)
     wet.gain.cancelScheduledValues(t);
     wet.gain.setValueAtTime(wet.gain.value, t);
     wet.gain.linearRampToValueAtTime(p.wet ?? 0.25, t + ramp);
+
+    dry.gain.cancelScheduledValues(t)
+    dry.gain.setValueAtTime(dry.gain.value + 0.3, t);
+    dry.gain.linearRampToValueAtTime(1.0 - wet.gain.value, t + 0.03);
 
     // only auto-off if dur is explicitly provided (hit)
     if (p.dur != null) {
@@ -89,9 +108,13 @@ export function createReverbChain(audioCtx) {
   function disconnect(t = audioCtx.currentTime) {
     if (!connected) return;
 
-    wet.gain.cancelScheduledValues(t);
-    wet.gain.setValueAtTime(wet.gain.value, t);
-    wet.gain.linearRampToValueAtTime(0.0, t + 0.03);
+    // wet.gain.cancelScheduledValues(t);
+    // wet.gain.setValueAtTime(wet.gain.value, t);
+    // wet.gain.linearRampToValueAtTime(0.0, t + 0.03);
+    //
+    // dry.gain.cancelScheduledValues(t)
+    // dry.gain.setValueAtTime(1.0 - wet.gain.value + 0.3, t);
+    // dry.gain.linearRampToValueAtTime(0.0, t + 0.03);
 
     setTimeout(() => {
       try { lastIn.disconnect(input); } catch {}
