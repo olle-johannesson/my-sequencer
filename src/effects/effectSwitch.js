@@ -6,6 +6,8 @@ import {createGrainChain, presets as grainPresets} from "./grainChain.js";
 import {createReverbChain, presets as reverbPresets} from "./reverbChain.js";
 import {createPitchChain, presets as pitchPresets} from "./pitchChain.js";
 import {bpm} from "../looper.js";
+import {thunk} from "../util/thunk.js";
+import {createRepeat, presets as repeatPresets} from "./repeat.js";
 
 export const allPresets = {
   crunch: { chain: 'bitcrush', preset: bitcrushPresets.crunch },
@@ -23,10 +25,18 @@ export const allPresets = {
   semitoneDown: { chain: 'pitch', preset: pitchPresets.semitoneDown },
   vibrato: { chain: 'delay', preset: delayPresets.semitoneUp },
   medium: { chain: 'reverb', preset: reverbPresets.medium },
-  small: { chain: 'reverb', preset: reverbPresets.small }
+  small: { chain: 'reverb', preset: reverbPresets.small },
+  repeat1: { chain: 'repeat', preset: repeatPresets.middle },
+  repeat2: { chain: 'repeat', preset: repeatPresets.fast }
 }
 
-export function createFxEngine(audioCtx) {
+/**
+ * Creates an audio effect chain and switches the audio path between them when one is 'activated'
+ *
+ * @param audioCtx
+ * @return {{activate: activate, deactivate: deactivate}}
+ */
+export function createEffectSwitch(audioCtx) {
   const chains = {
     bitcrush: createBitcrushChain(audioCtx),
     delay: createDelayChain(audioCtx),
@@ -34,36 +44,42 @@ export function createFxEngine(audioCtx) {
     gate: createGateChain(audioCtx),
     grain: createGrainChain(audioCtx),
     pitch: createPitchChain(audioCtx),
-    reverb: createReverbChain(audioCtx)
+    reverb: createReverbChain(audioCtx),
+    repeat: createRepeat()
   }
   let active = null;
 
   function activate(chain, config, startTime, inputNode, outputNode) {
-    // If config is a function (BPM-dependent preset), call it to get the actual config
-    const resolvedConfig = typeof config === 'function' ? config() : config;
-
     const _config = {
-      ...resolvedConfig,
-      t: startTime || resolvedConfig.t || audioCtx.currentTime,
-      in: inputNode || resolvedConfig.in,
-      out: outputNode || resolvedConfig.out
-    }
+      ...thunk(config), ...{
+        t: startTime || audioCtx.currentTime,
+        in: inputNode,
+        out: outputNode
+      }}
 
-    if (active && active === chain) {
-      return
+    switch(true) {
+      case active && active === chain: {
+        break
+      }
+      case active && active !== chain: {
+        chains[active].disconnect(audioCtx.currentTime);
+        chains[chain].connect(_config);
+        active = chain;
+        break;
+      }
+      case !active: {
+        chains[chain].connect(_config);
+        active = chain;
+        break
+      }
     }
-
-    if (active && active !== chain) {
-      chains[active].disconnect(audioCtx.currentTime);
-    }
-
-    chains[chain].connect(_config);
-    active = chain;
   }
 
   function deactivate(endTime) {
     const t = endTime ?? audioCtx.currentTime;
-    if (active) chains[active].disconnect(t);
+    if (active) {
+      chains[active].disconnect(t);
+    }
     active = null;
   }
 

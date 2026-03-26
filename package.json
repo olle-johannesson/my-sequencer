@@ -9,7 +9,9 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "eruda": "^3.4.3",
     "vite": "^7.1.7",
+    "vite-plugin-mkcert": "^1.17.9",
     "vite-plugin-node-polyfills": "^0.24.0"
   },
   "dependencies": {

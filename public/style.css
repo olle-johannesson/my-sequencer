@@ -1,6 +1,6 @@
 :root {
     --button-color: #333333;
-    --shadow-width: 30px;
+    --shadow-width: 0px;
     --ripple-inner: #FF4136;
     --ripple-outer: #FFB700;
     --ripple-speed: .5s;
@@ -45,7 +45,7 @@ body::before {
 
 /* When checkbox is checked, expand the color background */
 body:has(#audio-toggle:checked)::before {
-    clip-path: circle(200vmax at var(--ripple-x) var(--ripple-y));
+    /*clip-path: circle(200vmax at var(--ripple-x) var(--ripple-y));*/
 }
 
 html:has(#audio-toggle:checked) {
@@ -65,12 +65,28 @@ button, #hold {
     cursor: pointer;
     position: relative;
     transition: background-color .35s ease-out,
-                box-shadow       .25s ease-in-out,
                 transform       0.15s ease-out;
-    box-shadow: 0 0 var(--shadow-width) var(--button-color);
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    overflow: visible;
+}
+
+#freq-blob {
+    position: absolute;
+    width: 250%;
+    height: 250%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 0;
+    /*filter: blur(10px);*/
+}
+
+#freq-blob path {
+    fill: var(--button-color);
+    opacity: 1;
 }
 
 #fx {
@@ -120,10 +136,17 @@ label#hold:active {
 }
 
 label svg {
+    pointer-events: none;
+}
+
+/* Main icon only (not blob, not stars) */
+label > svg:not(#freq-blob):not(.mic-star) {
     width: 100%;
     height: 100%;
     margin-bottom: 20%;
     display: inline-block;
+    position: relative;
+    z-index: 1;
 }
 
 label .ripple-circles {
@@ -193,7 +216,6 @@ label:hover>.mic-star, label:focus>.mic-star, .disco>.mic-star {
     left: var(--x, 0%);
     transform: translate(-50%, -50%) scale(var(--scale, 1));
     animation: twinkle var(--dur, 2.5s) ease-in-out infinite;
-    /*animation-delay: var(--delay, 0s);*/
 }
 
 .disco {

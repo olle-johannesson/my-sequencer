@@ -11,6 +11,10 @@
 
     <label for="audio-toggle" id="hold" class="">
 
+      <!-- Frequency blob background -->
+      <svg id="freq-blob" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+        <path id="blob-path" d="M 150.0 80.0 L 157.3 80.4 L 164.6 81.5 L 171.6 83.4 L 178.5 86.1 L 185.0 89.4 L 191.1 93.4 L 196.8 98.0 L 202.0 103.2 L 206.6 108.9 L 210.6 115.0 L 213.9 121.5 L 216.6 128.4 L 218.5 135.4 L 219.6 142.7 L 220.0 150.0 L 219.6 157.3 L 218.5 164.6 L 216.6 171.6 L 213.9 178.5 L 210.6 185.0 L 206.6 191.1 L 202.0 196.8 L 196.8 202.0 L 191.1 206.6 L 185.0 210.6 L 178.5 213.9 L 171.6 216.6 L 164.6 218.5 L 157.3 219.6 L 150.0 220.0 L 142.7 219.6 L 135.4 218.5 L 128.4 216.6 L 121.5 213.9 L 115.0 210.6 L 108.9 206.6 L 103.2 202.0 L 98.0 196.8 L 93.4 191.1 L 89.4 185.0 L 86.1 178.5 L 83.4 171.6 L 81.5 164.6 L 80.4 157.3 L 80.0 150.0 L 80.4 142.7 L 81.5 135.4 L 83.4 128.4 L 86.1 121.5 L 89.4 115.0 L 93.4 108.9 L 98.0 103.2 L 103.2 98.0 L 108.9 93.4 L 115.0 89.4 L 121.5 86.1 L 128.4 83.4 L 135.4 81.5 L 142.7 80.4 Z" fill="var(--button-color)"/>
+      </svg>
 
       <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -106,6 +110,10 @@
       <button id="medium">medium</button>
       <button id="small">small</button>
     </div>
+
+    <script src="../node_modules/eruda/eruda.js"></script>
+    <script>eruda.init();</script>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

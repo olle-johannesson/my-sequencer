@@ -1,21 +1,15 @@
 import {thunk} from "./util/thunk.js";
 import {getNormallyDistributedNumber} from "./util/random.js";
 import {clamp} from "./util/clamp.js";
-import {allPresets, createFxEngine} from "./effects/fxEngine.js";
-import {continueEffectPattern} from "./pattern.js";
+import {playMonophonicSampleAt, playSampleAt} from "./audio/samplePlayer.js";
+import {repeatState} from "./effects/repeat.js";
 
 export let bpm = 120;
-let fxi = 0
+let isRunning = false
 let currentStep = 0
+let currentBar = 0
 let nextStepTime = undefined
-let scheduledSamples = [...new Array(16)].map(() => new Set())
-let scheduledFx = [...new Array(16)].map(() => null);
-let repeatState = {
-  active: false,
-  subdivision: 2
-};
 
-const currentlyPlaying = new Map()
 const stepsPerBeat = 4;
 const calculateStepDuration = () => 60 / bpm / stepsPerBeat;
 const scheduleAheadTime = 0.1;
@@ -26,7 +20,10 @@ const velocityByStep = [
   0.9, 0.5, 0.7, 0.5,
   0.8, 0.4, 0.6, 0.5
 ];
-const commonBpmSettings = [72, 88, 96, 112, 120, 132, 144]
+const commonBpmSettings = [
+  72, 88, 96, 112, 120,
+  132, 144
+]
 
 export function rndBpm() {
   const maxIndex = commonBpmSettings.length - 1
@@ -35,172 +32,75 @@ export function rndBpm() {
   bpm = commonBpmSettings[clamped]
 }
 
-/**
- * Schedule a new sample to be played
- * @param index {number}
- * @param sample {AudioBuffer}
- */
-export function scheduleSample(index, sample) {
-  scheduledSamples[index].add(sample);
+export function startLoop(audioContext, outputNode, samplePattern, drumPattern, callbacks = {}) {
+  isRunning = true
+  scheduler(audioContext, outputNode, samplePattern, drumPattern, callbacks)
 }
 
-/**
- * Schedule a new effect
- * @param index {number}
- * @param fx {{ chain: string, preset: string }}
- */
-export function scheduleFx(index, fx) {
-  scheduledFx[index] = fx
+export function stopLoop() {
+  isRunning = false
 }
 
-/**
- * Clear a sample from the playing schedule
- * @param sample {AudioBuffer}
- */
-export function clearSample(sample) {
-  scheduledSamples.forEach(slot => slot.delete(sample));
-}
+function scheduler(audioContext, outputNode, samplePattern, drumPattern, callbacks = {}) {
+  if (!isRunning) {
+    return
+  }
 
-/**
- * Remove all samples from the playing schedule
- */
-export function clearAllSamples() {
-  scheduledSamples = [...new Array(16)].map(() => new Set())
-}
-
-/**
- * Remove all effects from the effect schedule
- */
-export function clearAllFx() {
-  scheduledFx = [...new Array(16)].map(() => null);
-}
-
-let g
-
-export function scheduler(audioContext, outputNode) {
-  // if (!fxEngine) {
-  //   fxEngine = createFxEngine(audioContext)
-  // }
   if (nextStepTime === undefined) {
     nextStepTime = audioContext?.currentTime + 0.1;
   }
 
   while (nextStepTime < audioContext.currentTime + scheduleAheadTime) {
-    // if (!g) {
-    //   g = audioContext.createGain();
-    //   g.gain.value = 1
-    // }
-    // const scheduledEffect = scheduledFx[currentStep];
-    // if (scheduledEffect) {
-    //   fxEngine.activate(scheduledEffect.chain, scheduledEffect.preset, nextStepTime, g, outputNode)
-    // }
+    if (currentStep === samplePattern.length - 1 && typeof callbacks.beforeEachCycle === 'function') {
+      callbacks.beforeEachCycle(currentBar)
+    }
 
-    const stepSamples = scheduledSamples[currentStep] ?? new Set()
+    const stepSamples = samplePattern[currentStep] ?? new Set()
+    const drumSamples = drumPattern[currentStep] ?? new Set()
     const stepVelocity = velocityByStep[currentStep % velocityByStep.length] ?? 1;
 
     const samplesToPlay = Array.from(stepSamples)
-      .filter(Boolean)
       .map(thunk)
-      .filter(f => f instanceof AudioBuffer);
+      .filter(f => f instanceof AudioBuffer)
+      .map(sample => {
+        const humanFactor = getNormallyDistributedNumber(0, 0.05);
+        const gain = baseGain * stepVelocity + humanFactor;
+        return t => playMonophonicSampleAt(audioContext, sample, t, gain, outputNode)
+      })
 
-    samplesToPlay.forEach(sample => {
-      const humanFactor = getNormallyDistributedNumber(0, 0.05);
-      const gain = baseGain * stepVelocity + humanFactor;
+    const drumsToPlay = Array.from(drumSamples)
+      .map(thunk)
+      .filter(f => f instanceof AudioBuffer)
+      .map(sample => {
+        const humanFactor = getNormallyDistributedNumber(0, 0.025);
+        const gain = baseGain * stepVelocity + humanFactor;
+        return t => playSampleAt(audioContext, sample, t, gain, outputNode)
+      })
 
-      // Play the sample normally
-      playSampleAt(audioContext, sample, nextStepTime, gain, outputNode)
+    ;[...samplesToPlay, ...drumsToPlay].forEach(job => job(nextStepTime))
 
-      // If repeat is active, schedule additional rapid-fire plays
-      if (repeatState.active) {
-        const repeatInterval = calculateStepDuration() / repeatState.subdivision;
-        const timeUntilNextStep = nextStepTime - audioContext?.currentTime
+    if (repeatState.active) {
+      const repeatInterval = calculateStepDuration() / repeatState.subdivision;
+      let repeatTime = nextStepTime + repeatInterval;
 
-        // Schedule repeats until the next step
-        let repeatTime = nextStepTime + repeatInterval;
-
-        while (repeatTime < nextStepTime + calculateStepDuration()) {
-          playSampleAt(audioContext, sample, repeatTime, baseGain * 0.8, outputNode);
-          repeatTime += repeatInterval;
-        }
+      while (repeatTime < nextStepTime + calculateStepDuration()) {
+        ;[...samplesToPlay, ...drumsToPlay].forEach(job => job(repeatTime))
+        repeatTime += repeatInterval;
       }
-    })
+    }
 
-    // if (currentStep === 0) {
-    // //   continueEffectPattern((i, p) => scheduleFx(i, allPresets[p]), clearAllFx)
-    //   clearAllFx()
-    //   console.log(allPresets[fxi])
-    //   const someStep = 0 // Math.floor(Math.random() * 16)
-    //   for (let i = someStep; i < 16; i++) {
-    //     scheduleFx(fxi, allPresets[fxi])
-    //     // scheduleFx(Math.min(someStep + i, 15), allPresets[Math.floor(Math.random() * allPresets.length)])
-    //   }
-    //   fxi = ++fxi % allPresets.length
-    // }
-    currentStep = (currentStep + 1) % scheduledSamples.length;
+    currentStep = (currentStep + 1) % samplePattern.length;
+    if (currentStep === 0) {
+      currentBar++
+    }
+
+    if (typeof callbacks.beforeNextStep === 'function') {
+      callbacks.beforeNextStep(currentStep, currentBar)
+    }
+
     nextStepTime += calculateStepDuration();
   }
 
-  requestAnimationFrame(() => scheduler(audioContext, outputNode));
+  requestAnimationFrame(() => scheduler(audioContext, outputNode, samplePattern, drumPattern, callbacks));
 }
-
-function stopWithFade(audioContext, bufferSource, gainNode, fadeMs = 5) {
-  const now = audioContext.currentTime;
-  const fade = fadeMs / 1000;
-
-  gainNode.gain.cancelScheduledValues(now);
-  gainNode.gain.setValueAtTime(gainNode.gain.value, now);
-  gainNode.gain.linearRampToValueAtTime(0.0001, now + fade);
-
-  bufferSource.stop(now + fade + 0.001);
-}
-
-function playSampleAt(audioContext, sample, time, gain = 1, outputNode) {
-  if (!sample) return;
-
-  // Only stop currently playing if we're scheduling for immediate playback
-  // (within 50ms). For future scheduling (repeats), allow polyphonic playback.
-  const now = audioContext.currentTime;
-  const isImmediate = (time - now) < 0.05;
-
-  if (isImmediate && currentlyPlaying.has(sample)) {
-    try {
-      const { bufferSource, gainNode } = currentlyPlaying.get(sample)
-      stopWithFade(audioContext, bufferSource, gainNode)
-    } catch {}
-    currentlyPlaying.delete(sample)
-  }
-
-  let bufferSource = audioContext.createBufferSource()
-  bufferSource.buffer = sample;
-
-  const gainNode = audioContext.createGain();
-  gainNode.gain.value = gain;
-
-  bufferSource.connect(gainNode);
-  gainNode.connect(outputNode);
-
-  bufferSource.start(time);
-
-  // Only track as "currently playing" if it's immediate
-  if (isImmediate) {
-    currentlyPlaying.set(sample, { bufferSource, gainNode })
-  }
-}
-
-/**
- * Start repeating scheduled samples at a given subdivision
- * @param subdivision {number} - BPM subdivision (8 = 32nd notes, 16 = 16th, 2 = 8th, 1 = quarter)
- */
-export function startRepeat(subdivision) {
-  repeatState.active = true;
-  repeatState.subdivision = subdivision;
-}
-
-/**
- * Stop repeating
- */
-export function stopRepeat() {
-  repeatState.active = false;
-}
-
 
