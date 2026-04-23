@@ -12,6 +12,7 @@ import {clearAllEffects} from "./patterns/effectPattern.js";
 import {startLoop, stopLoop} from "./looper.js";
 import {attachEventListenersToAudioToggle, resetIsRecording, showIsRecording, showLoader} from "./ui/audioToggle.js";
 import {spectrumSize} from "./config.js";
+import {createPresetTuner} from "./dev/presetTuner.js";
 
 let audioContext, microphoneStream, effectSwitch, drumSamples, recordingChain, masterBus, hideLoader
 
@@ -53,6 +54,7 @@ async function start() {
     )
 
   setupEffectButtons(audioContext, masterBus.in, masterBus.out)
+  createPresetTuner(effectSwitch, audioContext, masterBus.in, masterBus.out)
   recordingChain.startRecordingSamples(
     newRecordedSample => addNewRecordedSample(newRecordedSample, scheduleSample, clearSample))
   hideLoader()

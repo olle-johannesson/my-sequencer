@@ -1,18 +1,27 @@
 import { defineConfig } from 'vite';
-import { nodePolyfills } from 'vite-plugin-node-polyfills'
 import mkcert from 'vite-plugin-mkcert'
 
 export default defineConfig({
+  base: "./",
   plugins: [
-    nodePolyfills(),
-    mkcert()
+    mkcert(),
   ],
   define: {
-    // some magenta deps expect `global`
+    // Transitive deps (e.g. typedarray-pool) reference bare `global`.
+    // Safe to rewrite now that Magenta's compat/global.js (which would
+    // mis-detect Node via globalThis.process) is aliased away below.
     global: 'globalThis',
   },
+  resolve: {
+    // Magenta's compat/global.js references bare `global` and conditionally
+    // `require('node-fetch')`. global_browser.js next to it exports the same
+    // names, purely browser-flavored.
+    alias: [
+      { find: /^.*\/compat\/global$/, replacement: '@magenta/music/esm/core/compat/global_browser' },
+    ],
+  },
   optimizeDeps: {
-    include: ['@magenta/music'], // make sure it’s pre-bundled
+    include: ['@magenta/music'],
   },
   server: {
     host: true,

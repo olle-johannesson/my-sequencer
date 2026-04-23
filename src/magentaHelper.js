@@ -1,5 +1,3 @@
-import './polyfills';
-
 const drumUrl = 'https://storage.googleapis.com/magentadata/js/checkpoints/music_rnn/drum_kit_rnn';
 const numberOfSteps = 16;
 let seed, rnn, sequences, MusicRNN;
