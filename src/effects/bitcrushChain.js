@@ -1,6 +1,6 @@
 export const presets = {
   crunch: {
-    crush: { bitDepth: 7, rateReduction: 0.32 },
+    crush: { bitDepth: 4, rateReduction: 0.32 },
     postLPF: { enabled: true, hz: 9000, Q: 0.7 },
     outGain: 1.0,
   },

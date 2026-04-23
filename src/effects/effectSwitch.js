@@ -59,6 +59,7 @@ export function createEffectSwitch(audioCtx) {
 
     switch(true) {
       case active && active === chain: {
+        chains[active].connect(_config);
         break
       }
       case active && active !== chain: {

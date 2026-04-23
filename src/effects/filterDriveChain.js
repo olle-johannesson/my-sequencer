@@ -2,39 +2,45 @@ import {makeDriveCurve} from "../util/driveCurve.js";
 
 export const presets = {
   distort: {
-    filter: {
-      type: 'lowpass',
-      Q: 0.7,
-      baseHz: 8000,  // Static high cutoff
-      depthHz: 0,     // No modulation - pure distortion
-      rateHz: 0.1,
+    "filter": {
+      "type": "lowpass",
+      "Q": 6.2,
+      "baseHz": 4162,
+      "depthHz": 20,
+      "rateHz": 0.1
     },
-    drive: { amount: 0.85 },  // Heavy drive for aggressive distortion
-    outGain: 1.0,
+    "drive": {
+      "amount": 1
+    },
+    "outGain": 1
   },
 
   bandDrift: {
-    filter: {
-      type: 'bandpass',
-      Q: 8,
-      baseHz: 1200,
-      depthHz: 900,
-      rateHz: 0.37,
+    "filter": {
+      "type": "bandpass",
+      "Q": 15.1,
+      "baseHz": 2358,
+      "depthHz": 2276,
+      "rateHz": 0.2
     },
-    drive: { amount: 0.15 },
-    outGain: 1.0,
+    "drive": {
+      "amount": 0.15
+    },
+    "outGain": 1
   },
 
   lpWobble: {
-    filter: {
-      type: 'lowpass',
-      Q: 0.9,
-      baseHz: 1800,
-      depthHz: 1400,
-      rateHz: 0.29,
+    "filter": {
+      "type": "lowpass",
+      "Q": 15.8,
+      "baseHz": 6267,
+      "depthHz": 5799,
+      "rateHz": 0.5
     },
-    drive: { amount: 0.12 },
-    outGain: 1.0,
+    "drive": {
+      "amount": 0.12
+    },
+    "outGain": 1
   },
 };
 
@@ -79,6 +85,7 @@ export function createFilterDriveChain(audioCtx) {
   lfo.connect(lfoGain).connect(filter.frequency);
 
   let lfoStarted = false;
+
   function startLfo(t) {
     if (!lfoStarted) {
       lfo.start(t);
@@ -140,8 +147,14 @@ export function createFilterDriveChain(audioCtx) {
     filter.Q.setValueAtTime(1, t);
     drive.curve = makeDriveCurve(0);  // Clean, no distortion
 
-    try { lastIn.disconnect(input); } catch {}
-    try { output.disconnect(lastOut); } catch {}
+    try {
+      lastIn.disconnect(input);
+    } catch {
+    }
+    try {
+      output.disconnect(lastOut);
+    } catch {
+    }
 
     connected = false;
     lastIn = null;
@@ -151,6 +164,6 @@ export function createFilterDriveChain(audioCtx) {
   return {
     connect,
     disconnect,
-    nodes: { input, filter, drive, lfo, lfoGain, output },
+    nodes: {input, filter, drive, lfo, lfoGain, output},
   };
 }

@@ -1,7 +1,7 @@
 export const presets = {
   slapback: {
     delayTime: 0.11,
-    feedback: 0.22,
+    feedback: 0.1,
     fbLPFHz: 7000,
     wet: 0.28,
     wetRampMs: 15,
@@ -10,7 +10,7 @@ export const presets = {
 
   dub: {
     delayTime: 0.22,
-    feedback: 0.68,
+    feedback: 0,
     fbLPFHz: 3200,
     wet: 0.45,
     wetRampMs: 15,

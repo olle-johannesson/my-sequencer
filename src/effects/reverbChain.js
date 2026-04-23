@@ -1,11 +1,11 @@
 export const presets = {
   small: {
-    wet: 0.25,
+    wet: 0.53,
     rampMs: 40,
     toneLPFHz: 8000,
     convolutionSeconds: 0.3,
     decay: 1.5,
-    makeupGain: 3.0,
+    makeupGain: 3
   },
   medium: {
     wet: 0.90,
