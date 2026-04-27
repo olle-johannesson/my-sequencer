@@ -3,6 +3,7 @@ import {getNormallyDistributedNumber} from "./util/random.js";
 import {clamp} from "./util/clamp.js";
 import {playMonophonicSampleAt, playSampleAt} from "./audio/samplePlayer.js";
 import {repeatState} from "./effects/repeat.js";
+import {incrementPatternAge} from "./patterns/samplePattern.js";
 
 export let bpm = 96;
 let isRunning = false
@@ -20,6 +21,16 @@ const velocityByStep = [
   0.9, 0.5, 0.7, 0.5,
   0.8, 0.4, 0.6, 0.5
 ];
+
+let swingByStep = new Array(16).fill(0)
+
+export function setSwing(perStepFractions) {
+  swingByStep = new Array(16).fill(0)
+  if (!perStepFractions) return
+  for (const [step, fraction] of Object.entries(perStepFractions)) {
+    swingByStep[+step] = fraction
+  }
+}
 const commonBpmSettings = [
   72, 88, 96, 112, 120,
   132, 144
@@ -30,6 +41,12 @@ export function rndBpm() {
   const rndIndex = Math.round(getNormallyDistributedNumber(maxIndex / 2, 2))
   const clamped = clamp(rndIndex, 0, maxIndex)
   bpm = commonBpmSettings[clamped]
+}
+
+export function setBpm(newBpm) {
+  if (typeof newBpm === 'number' && newBpm > 0) {
+    bpm = newBpm
+  }
 }
 
 export function startLoop(audioContext, outputNode, samplePattern, drumPattern, callbacks = {}) {
@@ -80,13 +97,16 @@ function scheduler(audioContext, outputNode, samplePattern, drumPattern, callbac
         return t => playSampleAt(audioContext, sample, t, gain, outputNode)
       })
 
-    ;[...samplesToPlay, ...drumsToPlay].forEach(job => job(nextStepTime))
+    const swingDelay = swingByStep[currentStep % swingByStep.length] * calculateStepDuration()
+    const stepPlayTime = nextStepTime + swingDelay
+
+    ;[...samplesToPlay, ...drumsToPlay].forEach(job => job(stepPlayTime))
 
     if (repeatState.active) {
       const repeatInterval = calculateStepDuration() / repeatState.subdivision;
-      let repeatTime = nextStepTime + repeatInterval;
+      let repeatTime = stepPlayTime + repeatInterval;
 
-      while (repeatTime < nextStepTime + calculateStepDuration()) {
+      while (repeatTime < stepPlayTime + calculateStepDuration()) {
         ;[...samplesToPlay, ...drumsToPlay].forEach(job => job(repeatTime))
         repeatTime += repeatInterval;
       }
@@ -95,6 +115,7 @@ function scheduler(audioContext, outputNode, samplePattern, drumPattern, callbac
     currentStep = (currentStep + 1) % samplePattern.length;
     if (currentStep === 0) {
       currentBar++
+      incrementPatternAge()
     }
 
     if (typeof callbacks.beforeNextStep === 'function') {

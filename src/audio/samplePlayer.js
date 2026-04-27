@@ -1,4 +1,19 @@
 const currentlyPlaying = new Map()
+const pendingSources = new Set()
+
+function track(bufferSource) {
+  pendingSources.add(bufferSource)
+  bufferSource.onended = () => pendingSources.delete(bufferSource)
+}
+
+export function cancelAllScheduled() {
+  for (const src of pendingSources) {
+    try { src.stop() } catch {}
+    try { src.disconnect() } catch {}
+  }
+  pendingSources.clear()
+  currentlyPlaying.clear()
+}
 
 /**
  * Schedule a sample to be played at an exact time.
@@ -38,6 +53,7 @@ export function playMonophonicSampleAt(audioContext, sample, time, gain = 1, out
   gainNode.connect(outputNode);
 
   bufferSource.start(time);
+  track(bufferSource)
 
   // Only track as "currently playing" if it's immediate
   if (isImmediate) {
@@ -67,6 +83,7 @@ export function playSampleAt(audioContext, sample, time, gain = 1, outputNode) {
   gainNode.connect(outputNode);
 
   bufferSource.start(time);
+  track(bufferSource)
 }
 
 function stopWithFade(audioContext, bufferSource, gainNode, fadeMs = 5) {

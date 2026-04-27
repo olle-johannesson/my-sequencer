@@ -1,4 +1,6 @@
 // Disco / "Billie Jean"-ish straight pop groove
+import {DRUM_TO_PITCH} from "../drumNameMaps.js";
+
 export const aDiscoPopSeed = {
   notes: [
     { pitch: DRUM_TO_PITCH.kick,  startTime: 0.0,  endTime: 0.08 },

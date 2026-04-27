@@ -1,4 +1,6 @@
 // Boom-bap / "Impeach the President"-adjacent hip-hop skeleton
+import {DRUM_TO_PITCH} from "../drumNameMaps.js";
+
 export const aBoomBapSeed = {
   notes: [
     { pitch: DRUM_TO_PITCH.kick,  startTime: 0.0,   endTime: 0.1 },

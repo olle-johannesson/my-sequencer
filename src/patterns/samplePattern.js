@@ -1,6 +1,7 @@
+let patternAge = 0
 let scheduledSamples = [...new Array(16)].map(() => new Set())
 
-export { scheduledSamples as samplePattern }
+export { scheduledSamples as samplePattern, patternAge as samplePatternAge }
 
 /**
  * Schedule a new sample to be played
@@ -9,6 +10,7 @@ export { scheduledSamples as samplePattern }
  */
 export function scheduleSample(index, sample) {
   scheduledSamples[index].add(sample);
+  patternAge = 0
 }
 
 /**
@@ -17,6 +19,7 @@ export function scheduleSample(index, sample) {
  */
 export function clearSample(sample) {
   scheduledSamples.forEach(slot => slot.delete(sample));
+  patternAge = 0
 }
 
 /**
@@ -24,4 +27,9 @@ export function clearSample(sample) {
  */
 export function clearAllSamples() {
   scheduledSamples = [...new Array(16)].map(() => new Set())
+  patternAge = 0
+}
+
+export function incrementPatternAge() {
+  patternAge = patternAge + 1
 }
