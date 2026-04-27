@@ -39,6 +39,9 @@ export function startLoop(audioContext, outputNode, samplePattern, drumPattern, 
 
 export function stopLoop() {
   isRunning = false
+  currentStep = 0
+  currentBar = 0
+  nextStepTime = undefined
 }
 
 function scheduler(audioContext, outputNode, samplePattern, drumPattern, callbacks = {}) {
