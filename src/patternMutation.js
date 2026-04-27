@@ -2,6 +2,7 @@ import {continuePattern} from "./magentaHelper.js";
 import {getNormallyDistributedNumber} from "./util/random.js";
 import {evenlySpacedPartitions} from "./util/evenlySpacedPartitions.js";
 import {DRUM_TO_PITCH} from "./drums/drumNameMaps.js";
+import {clearSample} from "./patterns/samplePattern.js";
 
 const maxAttemptsToScheduleNewSample = 5
 const maxSamples = 5
@@ -91,6 +92,13 @@ export async function addNewRecordedSample(sample, scheduleSample, clearSample) 
   })
 }
 
+export function rescheduleOneOfTheRecordedSamples(scheduleSample, clearSample) {
+  const samples = samplePattern.flatMap(step => step.map(d => d.sample))
+  let randomSample = samples[Math.floor(Math.random() * samples.length)]
+  clearSample(randomSample)
+  addNewRecordedSample(randomSample, scheduleSample, clearSample)
+}
+
 export async function continueEffectPattern(scheduleEffect, clearAllEffects) {
   const ghostPitchIndex = ++nextEffect % pitchesNotCollidingWithTheFillerPitches.length
   const ghostPitch = pitchesNotCollidingWithTheFillerPitches[ghostPitchIndex]
@@ -116,8 +124,6 @@ export async function continueEffectPattern(scheduleEffect, clearAllEffects) {
     }
   })
 }
-
-
 
 
 /**

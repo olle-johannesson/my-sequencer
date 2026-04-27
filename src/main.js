@@ -1,18 +1,19 @@
 import {createEffectSwitch} from "./effects/effectSwitch.js";
 import {setupEffectButtons} from "./ui/effectsButtons.js";
 import {setupMasterBus} from "./audio/masterChain.js";
-import {addNewRecordedSample} from "./patternMutation.js";
-import {clearAllSamples, clearSample, samplePattern, scheduleSample} from "./patterns/samplePattern.js";
+import {addNewRecordedSample, rescheduleOneOfTheRecordedSamples} from "./patternMutation.js";
+import {clearAllSamples, clearSample, samplePattern, samplePatternAge, scheduleSample} from "./patterns/samplePattern.js";
 import {getMicrophoneStream} from "./audio/microphoneInput.js";
 import {setupRecordingChain} from "./audio/recordingChain.js";
 import {loadAudioWorklets, pauseAudioContext, startAudioContext} from "./audio/audioSetup.js";
-import {clearAllDrums, drumPattern, updateDrumPattern} from "./patterns/drumPattern.js";
+import {clearAllDrums, drumPattern, initDrumPattern, updateDrumPattern} from "./patterns/drumPattern.js";
 import {clearAllEffects} from "./patterns/effectPattern.js";
 import {startLoop, stopLoop} from "./looper.js";
 import {cancelAllScheduled} from "./audio/samplePlayer.js";
 import {attachEventListenersToAudioToggle, resetIsRecording, showIsRecording, showLoader} from "./ui/audioToggle.js";
 import {spectrumSize} from "./config.js";
 import {createPresetTuner} from "./dev/presetTuner.js";
+
 
 let audioContext, microphoneStream, effectSwitch, /*drumSamples,*/ recordingChain, masterBus, hideLoader
 
@@ -47,14 +48,22 @@ async function start() {
     createPresetTuner(effectSwitch, audioContext, masterBus.in, masterBus.out)
   }
 
-  await updateDrumPattern(audioContext)
+  await initDrumPattern(audioContext)
 
   startLoop(
     audioContext,
     masterBus.in,
     samplePattern,
     drumPattern,
-    )
+    { beforeEachCycle: barNumber => {
+      if (barNumber % 2 === 0) {
+        updateDrumPattern()
+      }
+
+      if (samplePatternAge > 1) {
+        rescheduleOneOfTheRecordedSamples(scheduleSample, clearSample)
+      }
+    }})
 
   recordingChain.startRecordingSamples(
     newRecordedSample => addNewRecordedSample(newRecordedSample, scheduleSample, clearSample))
