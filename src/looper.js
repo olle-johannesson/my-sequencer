@@ -4,7 +4,7 @@ import {clamp} from "./util/clamp.js";
 import {playMonophonicSampleAt, playSampleAt} from "./audio/samplePlayer.js";
 import {repeatState} from "./effects/repeat.js";
 
-export let bpm = 120;
+export let bpm = 96;
 let isRunning = false
 let currentStep = 0
 let currentBar = 0
