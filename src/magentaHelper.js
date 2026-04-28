@@ -1,42 +1,55 @@
-const drumUrl = 'https://storage.googleapis.com/magentadata/js/checkpoints/music_rnn/drum_kit_rnn';
-const numberOfSteps = 16;
-let seed, rnn, sequences, MusicRNN;
+import {chartDiagnostic} from "./ui/messages.js"
 
-export let magentaIsReady = false;
+const numberOfSteps = 16
+const worker = new Worker(new URL('./workers/magenta.worker.js', import.meta.url), { type: 'module' })
+
+const pending = new Map()
+let nextId = 0
+
+worker.addEventListener('message', (e) => {
+  const { id, type, sequence, error } = e.data || {}
+  const resolver = pending.get(id)
+  if (!resolver) return
+  pending.delete(id)
+  if (type === 'error') resolver.reject(new Error(error))
+  else resolver.resolve(sequence)
+})
+worker.addEventListener('error', (e) => console.error('magenta worker error', e))
+
+function call(message) {
+  return new Promise((resolve, reject) => {
+    const id = ++nextId
+    pending.set(id, { resolve, reject })
+    worker.postMessage({ ...message, id })
+  })
+}
+
+export let magentaIsReady = true   // worker lazy-inits on first request
 
 export async function initMagenta() {
-  let module = await import('@magenta/music')
-  sequences = module.sequences;
-  MusicRNN = module.MusicRNN;
-  rnn = new MusicRNN(drumUrl);
-  await rnn.initialize();
-  magentaIsReady = true;
-
-  seed = {
-    notes: [
-      { pitch: 36, startTime: 0,   endTime: 0.5 }, // kick
-      { pitch: 38, startTime: 0.5, endTime: 1.0 }, // snare
-    ],
-    totalTime: 1.0,
-  };
-
-  seed = sequences.quantizeNoteSequence(seed, 4);
+  return call({ type: 'init' })
 }
 
 /**
- *
  * @param seed {INoteSequence}
  * @param temperature {number}
  * @returns {Promise<INoteSequence>}
  */
 export async function continuePattern(seed, temperature = 1.2) {
-  if (!rnn) await initMagenta();
-  // continueSequence requires an already-quantized sequence — it reads totalQuantizedSteps
-  // and each note's quantizedStartStep directly, NOT startTime. So we feed it our 16-step
-  // grid via quantizeSeed and bypass magenta's tempo-based quantizer (which would interpret
-  // startTime as seconds at 120 BPM and squash totalTime: 1.0 into 8 steps).
+  // continueSequence in the worker needs an already-quantized sequence on our 16-step grid.
+  // quantizeSeed runs synchronously here in main; the heavy inference runs in the worker.
   const quantized = seed?.totalQuantizedSteps !== undefined ? seed : quantizeSeed(seed)
-  return rnn.continueSequence(quantized, numberOfSteps, temperature);
+  const t0 = performance.now()
+  const result = await call({
+    type: 'continueSequence',
+    seed: quantized,
+    numberOfSteps,
+    temperature,
+  })
+  const dt = performance.now() - t0
+  const color = dt < 30 ? '#7e7' : dt < 100 ? '#ee7' : '#f55'
+  chartDiagnostic('magenta ms', dt, color)
+  return result
 }
 
 /**
@@ -56,9 +69,7 @@ export function quantizeSeed(seed) {
       quantizedStartStep: Math.round(n.startTime / total * 16) % 16,
       quantizedEndStep: Math.round(n.endTime / total * 16),
     })),
-    quantizationInfo: {stepsPerQuarter: 4},
+    quantizationInfo: { stepsPerQuarter: 4 },
     totalQuantizedSteps: 16,
   }
 }
-
-
