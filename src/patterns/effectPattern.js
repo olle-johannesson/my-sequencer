@@ -5,35 +5,43 @@ const scheduledFx = [...new Array(16)].map(() => null);
 export { scheduledFx as effectPattern }
 
 /**
- * Pick a small mutation: maybe drop a region, maybe add one. Keeps the pattern sparse so
- * effects punctuate rather than dominate. Caller passes the pool of candidate effect keys
- * (or objects) — typically Object.keys(allPresets).
+ * Pick a small mutation: maybe drop a region, maybe add one. Caller passes the
+ * pool of candidate effect keys plus an `intensity` (0..1) — typically the
+ * current creepIntensity(). At intensity 0 the pattern stays sparse with
+ * balanced add/remove and short regions; at intensity 1 effects accumulate
+ * (mostly add) and regions are longer/more sustained.
  * @param candidateEffects {Array<any>}
+ * @param {number} [intensity] 0..1; defaults to 0 (calm)
  */
-export function updateEffectPattern(candidateEffects) {
+export function updateEffectPattern(candidateEffects, intensity = 0) {
   if (!candidateEffects?.length) return
   const activeSteps = scheduledFx.filter(Boolean).length
 
+  // remove probability: 0.5 at calm → ~0.1 at wild (effects start stacking up)
+  const removeChance = 0.5 - 0.4 * intensity
+  // hard ceiling — even at wild, force a cleanup if the pattern is mostly full
+  const crowdedAt = 12
+
   let next
   if (activeSteps === 0) {
-    // empty — always add one
-    next = addAudibleRegion(scheduledFx, pickRandom(candidateEffects))
-  } else if (activeSteps > 8 || Math.random() < 0.45) {
-    // crowded or rolling the dice toward subtraction
+    next = addAudibleRegion(scheduledFx, pickRandom(candidateEffects), intensity)
+  } else if (activeSteps > crowdedAt || Math.random() < removeChance) {
     next = removeRandomRegion(scheduledFx)
   } else {
-    next = addAudibleRegion(scheduledFx, pickRandom(candidateEffects))
+    next = addAudibleRegion(scheduledFx, pickRandom(candidateEffects), intensity)
   }
 
   // mutate in place so the looper's captured reference sees the change
   for (let i = 0; i < scheduledFx.length; i++) scheduledFx[i] = next[i]
 }
 
-// Like addARandomRegion but with a length floor so the effect actually has time to be heard
-// (the util's N(0,3) distribution often produces regions of 1 step, which sounds like
-// the effect is glitching off every 16th).
-function addAudibleRegion(arr, value) {
-  const len = 3 + Math.floor(Math.random() * 5)   // 3..7 steps
+// Like addARandomRegion but with a length floor so the effect has time to be
+// heard (the util's N(0,3) distribution often produces regions of 1 step which
+// sounds like glitching). Length scales with intensity: 3-7 at calm, 5-12 at wild.
+function addAudibleRegion(arr, value, intensity = 0) {
+  const minLen = 3 + Math.floor(intensity * 2)        // 3..5
+  const maxLen = 7 + Math.floor(intensity * 5)        // 7..12
+  const len = minLen + Math.floor(Math.random() * (maxLen - minLen + 1))
   const start = Math.floor(Math.random() * arr.length)
   const end = (start + len - 1) % arr.length
   return addARegion(arr, start, end, value)

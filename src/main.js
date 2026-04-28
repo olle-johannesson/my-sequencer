@@ -1,5 +1,4 @@
-import {createEffectSwitch} from "./effects/effectSwitch.js";
-import {setupEffectButtons} from "./ui/effectsButtons.js";
+import {allPresets, createEffectSwitch} from "./effects/effectSwitch.js";
 import {setupMasterBus} from "./audio/masterChain.js";
 import {addNewRecordedSample, rescheduleOneOfTheRecordedSamples} from "./patternMutation.js";
 import {clearAllSamples, clearSample, samplePattern, samplePatternAge, scheduleSample} from "./patterns/samplePattern.js";
@@ -8,17 +7,16 @@ import {setupRecordingChain} from "./audio/recordingChain.js";
 import {loadAudioWorklets, pauseAudioContext, startAudioContext} from "./audio/audioSetup.js";
 import {clearAllDrums, drumPattern, initDrumPattern, updateDrumPattern} from "./patterns/drumPattern.js";
 import {clearAllEffects, effectPattern, updateEffectPattern} from "./patterns/effectPattern.js";
-import {allPresets} from "./effects/effectSwitch.js";
+import {creepEffectChance, creepIntensity, resetCreep} from "./patterns/creep.js";
 import {setDiagnostic} from "./ui/messages.js";
 import {startMainThreadMonitor} from "./dev/mainThreadMonitor.js";
-
-const effectKeys = Object.keys(allPresets)
-startMainThreadMonitor()
 import {startLoop, stopLoop} from "./looper.js";
 import {cancelAllScheduled} from "./audio/samplePlayer.js";
 import {attachEventListenersToAudioToggle, resetIsRecording, showIsRecording, showLoader} from "./ui/audioToggle.js";
 import {spectrumSize} from "./config.js";
-import {createPresetTuner} from "./dev/presetTuner.js";
+
+const effectKeys = Object.keys(allPresets)
+startMainThreadMonitor()
 
 
 let audioContext, microphoneStream, effectSwitch, /*drumSamples,*/ recordingChain, masterBus, hideLoader
@@ -68,11 +66,11 @@ async function start() {
     {
       beforeEachCycle: barNumber => {
         if (barNumber % 2 === 0) {
-          updateDrumPattern()
+          updateDrumPattern(audioContext)
         }
 
-        if (barNumber % 4 === 0) {
-          updateEffectPattern(effectKeys)
+        if (Math.random() < creepEffectChance()) {
+          updateEffectPattern(effectKeys, creepIntensity())
         }
 
         if (samplePatternAge > 1) {
@@ -90,7 +88,10 @@ async function start() {
     })
 
   recordingChain.startRecordingSamples(
-    newRecordedSample => addNewRecordedSample(newRecordedSample, scheduleSample, clearSample))
+    newRecordedSample => {
+      addNewRecordedSample(newRecordedSample, scheduleSample, clearSample)
+      resetCreep()
+    })
   hideLoader()
 }
 

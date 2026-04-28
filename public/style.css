@@ -319,3 +319,42 @@ label:hover>.mic-star, label:focus>.mic-star, .disco>.mic-star {
     animation-delay: calc(var(--ripple-speed) / 2);
 }
 
+/* Diagnostic panel — keep it inside the viewport on mobile. */
+#messages {
+    box-sizing: border-box;
+    max-width: 100vw;
+    padding: 6px 8px;
+    overflow-x: hidden;
+    font-family: monospace;
+    font-size: 11px;
+    color: #ccc;
+}
+
+#messages > div {
+    /* chart rows: allow flex children to shrink below their content width */
+    min-width: 0;
+}
+
+#messages > div > span:first-child {
+    /* label column: cap on narrow viewports so the chart has room */
+    flex-shrink: 0;
+    max-width: 40vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#messages > div > canvas {
+    /* let the chart shrink to fit; native drawing buffer stays the same so it
+       just scales — slight stretch but readable */
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 240px;
+    width: auto !important;
+}
+
+#messages .message {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+

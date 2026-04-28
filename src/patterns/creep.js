@@ -27,7 +27,7 @@ const FX_MAX_CHANCE = 0.5
 const FX_HALFBARS = 64      // bars to reach the cap
 
 const REVERT_MAX_CHANCE = 0.4
-const REVERT_HALFBARS = 96   // start gentle, peak chance once we've drifted far
+const REVERT_HALFBARS = 66   // start gentle, peak chance once we've drifted far
 
 export function tickCreep() {
   const aggressiveness = 1 + Math.random() * 0.01
