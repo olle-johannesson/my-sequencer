@@ -204,7 +204,7 @@ onmessage = async (e) => {
         calibrationFrames++;
         recordingState = 0;
       } else {
-        recordingState = recordingDecision(rms, spectralFlux);
+        recordingState = recordingDecision(rms, spectralFlux, spectralFlatness, spectralCentroid);
       }
 
       // Make sure we're not recording before updating the noise model.

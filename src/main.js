@@ -88,7 +88,11 @@ async function start() {
     })
 
   recordingChain.startRecordingSamples(
-    (newRecordedSample, classification) => {
+    (newRecordedSample, classification, features) => {
+      const color = classificationColor(classification)
+      if (features) {
+        showSampleInSlot(classification, features, color)
+      }
       addNewRecordedSample(newRecordedSample, scheduleSample, clearSample, classification)
       resetCreep()
     })

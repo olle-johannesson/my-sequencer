@@ -1,4 +1,5 @@
 import {MAGENTA_DRUM_CLASSES} from "../drums/drumNameMaps.js";
+import {matchDiscardProfile} from "./discardProfiles.js";
 
 const ATTACK_BLOCK = 2048   // power of 2; ~46 ms at 44.1 kHz — first slice for spectral features
 
@@ -14,6 +15,26 @@ export function classify(samples, sampleRate, Meyda) {
   const lowRatio  = bandEnergyRatio(amplitudeSpectrum, sampleRate, 0,    200)        // sub-200 Hz share
   const highRatio = bandEnergyRatio(amplitudeSpectrum, sampleRate, 5000, sampleRate / 2) // 5 kHz–nyquist share
 
+  const features = {
+    duration, decayTime, lowRatio, highRatio,
+    centroid: spectralCentroid, flatness: spectralFlatness,
+  }
+
+  // Second-line defense — anything that matches a discard profile here either
+  // snuck past the gate or only became identifiable as junk after we had the
+  // full buffer. Caller should treat null classification as "drop this sample".
+  const junk = matchDiscardProfile(features)
+  if (junk) {
+    return {classification: null, discardedAs: junk.name, features}
+  }
+
+  return {
+    classification: decide(duration, decayTime, lowRatio, highRatio, spectralCentroid, spectralFlatness),
+    features,
+  }
+}
+
+function decide(duration, decayTime, lowRatio, highRatio, spectralCentroid, spectralFlatness) {
   switch (true) {
     case lowRatio  > 0.55 && decayTime < 0.25:                return MAGENTA_DRUM_CLASSES.bassy
     case lowRatio  > 0.30 && decayTime < 0.5:                 return MAGENTA_DRUM_CLASSES.rumblyLow

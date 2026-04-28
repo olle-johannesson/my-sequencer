@@ -13,8 +13,9 @@ class Recorder extends AudioWorkletProcessor {
 
   constructor() {
     super();
-    this.sr = 44100;
-    this.len = Math.floor(this.sr * 2);
+    // `sampleRate` is a worklet global — picks up the actual context rate
+    // instead of pinning to 44.1 kHz.
+    this.len = Math.floor(sampleRate * 2);
     this.buf = new Float32Array(this.len);
     this.writeIdx = 0;
     this.wasRecording = 0;
@@ -45,7 +46,10 @@ class Recorder extends AudioWorkletProcessor {
 
     // falling edge → stop recording
     if (wasPreviouslyRecording && !isCurrentlyRecording) {
-      const copy = new Float32Array(this.buf);
+      // Send ONLY the portion we wrote — `this.buf` is a fixed-size 2-second
+      // scratch area; the rest is zeros from a previous fill. Without this slice,
+      // every recording would read as 2.0 s long downstream.
+      const copy = this.buf.slice(0, w);
       this.port.postMessage({ type: 'audio', audio: copy }, [copy.buffer]);
       this.port.postMessage({ type: 'rec end' });
     }
