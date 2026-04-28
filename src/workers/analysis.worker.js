@@ -2,6 +2,7 @@ import Meyda from "meyda"
 import {createFeatureMailboxViews, createNoiseSpectrumMailboxViews} from "../util/mailbox.js";
 import {rmsFromSpectrum} from "../dsp/rms.js";
 import {createConsecutiveGate} from "../util/consecutiveGate.js";
+import {matchDiscardProfile} from "../dsp/discardProfiles.js";
 
 let previousBlock
 let featureMailbox
@@ -123,10 +124,14 @@ setInterval(() => {
  * @param flux {number}
  * @return {number}
  */
-function recordingDecision(rms, flux) {
+function recordingDecision(rms, flux, flatness, centroid) {
   const startThreshold = rmsThreshold * START_FACTOR;
   const stopThreshold  = rmsThreshold * STOP_FACTOR;
-  const enterCond = rms > startThreshold && flux > 0.05;
+  // Reject if any DISCARD_PROFILE matches the current frame's features.
+  // Profiles needing post-classify-only features (lowRatio, decayTime, …)
+  // never match here — those undefined values fail every comparison.
+  const junk = matchDiscardProfile({rms, flux, flatness, centroid})
+  const enterCond = !junk && rms > startThreshold && flux > 0.05;
   const exitCond  = rms < stopThreshold //  || flux < 0.02;
   return hysteresisGate(enterCond, exitCond)
 }

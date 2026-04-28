@@ -52,9 +52,12 @@ self.onmessage = (e) => {
       const tailIndex = copy.length //findTail(float, sampleRate); // or just use float.length
       const trimmedView = copy.subarray(onsetIndex, tailIndex);
 
-      // if the trimmed view is too short, don't bother processing it
-      if (trimmedView.length < sampleRate / 2) {
-        console.log(`trimmed view too short (${trimmedView.length}), skipping`)
+      // Hard floor — anything below ~50 ms is glitch territory. Above that
+      // we trust the analysis worker's noise-gated recording decision.
+      // (The old threshold was 0.5 s, which only worked because the recorder
+      // worklet padded every recording to 2 s; that's no longer the case.)
+      if (trimmedView.length < sampleRate / 20) {
+        console.log(`recording too short (${trimmedView.length} samples), skipping`)
         return
       }
       // de-noise the sample using a wiener filter
@@ -64,9 +67,13 @@ self.onmessage = (e) => {
       const processed = new Float32Array(deNoised.length);
       processed.set(deNoised);
       applyEnvelope(processed, sampleRate);
-      const classification = classify(processed, sampleRate, Meyda)
+      const {classification, features, discardedAs} = classify(processed, sampleRate, Meyda)
+      if (!classification) {
+        console.log(`discarded sample (matched profile: ${discardedAs})`)
+        return
+      }
 
-      self.postMessage({samples: processed, sampleRate, classification}, [processed.buffer]);
+      self.postMessage({samples: processed, sampleRate, classification, features}, [processed.buffer]);
     }
   }
 };
