@@ -145,6 +145,6 @@ export async function setupRecordingChain(audioContext, microphoneStream, callBa
     recorder,
     analysisReader,
     startRecordingSamples: (onNewRecordedSample) => postProcessWorker.onmessage = (e) =>
-      onNewRecordedSample(audioBufferFromSAB(audioContext, e.data.samples), scheduleSample, clearSample)
+      onNewRecordedSample(audioBufferFromSAB(audioContext, e.data.samples), e.data.classification)
   };
 }

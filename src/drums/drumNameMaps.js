@@ -114,3 +114,30 @@ export const PITCH_TO_DRUM = Object.freeze({
   51: 'ride', 52: 'ride', 53: 'ride', 59: 'ride', 82: 'ride',
 })
 
+export const MAGENTA_DRUM_CLASSES = {
+  bassy: 'BASSY',
+  snappy: 'SNAPPY',
+  percussive: 'PERCUSSIVE',
+  bright: 'BRIGHT',
+  airy: 'AIRY',
+  rumblyLow: 'RUMBLY_LOW',
+  rumblyMid: 'RUMBLY_MID',
+  rumblyHigh: 'RUMBLY_HIGH',
+  cymbalCrash: 'CYMBAL_CRASH',
+  sustained: 'SUSTAINED'
+}
+
+export const GHOST_PITCHES_BY_CLASS = {
+  [MAGENTA_DRUM_CLASSES.bassy]:       [35],                                        // class 0 (kick), only spare member
+  [MAGENTA_DRUM_CLASSES.snappy]:      [27, 28, 31, 32, 33, 34, 37, 39],            // class 1 (snare) — typical snare role
+  [MAGENTA_DRUM_CLASSES.percussive]:  [56, 65, 66, 75, 85],                        // class 1 (cowbell, timbales, claves, castanets)
+  [MAGENTA_DRUM_CLASSES.bright]:      [54, 68, 69, 70, 71, 73, 78, 80],            // class 2 (closed hh / tambourine / cabasa / etc.)
+  [MAGENTA_DRUM_CLASSES.airy]:        [67, 72, 74, 79, 81],                        // class 3 (open hh / triangle / cuica)
+  [MAGENTA_DRUM_CLASSES.rumblyLow]:   [29, 41, 61, 64, 84],                        // class 4 (low tom / bongo lo / conga lo)
+  [MAGENTA_DRUM_CLASSES.rumblyMid]:   [47, 60, 63, 77, 86, 87],                    // class 5 (mid tom / bongo hi / woodblock)
+  [MAGENTA_DRUM_CLASSES.rumblyHigh]:  [30, 43, 62, 76, 83],                        // class 6 (high tom / open conga / sleigh)
+  [MAGENTA_DRUM_CLASSES.cymbalCrash]: [55, 57, 58],                                // class 7 (splash / crash / vibraslap)
+  [MAGENTA_DRUM_CLASSES.sustained]:   [52, 53, 59, 82],                            // class 8 (china / ride bell / shaker)
+}
+
+

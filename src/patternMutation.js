@@ -1,7 +1,7 @@
 import {continuePattern} from "./magentaHelper.js";
 import {getNormallyDistributedNumber} from "./util/random.js";
 import {evenlySpacedPartitions} from "./util/evenlySpacedPartitions.js";
-import {DRUM_TO_PITCH} from "./drums/drumNameMaps.js";
+import {DRUM_TO_PITCH, GHOST_PITCHES_BY_CLASS, MAGENTA_DRUM_CLASSES} from "./drums/drumNameMaps.js";
 
 const maxAttemptsToScheduleNewSample = 5
 const maxSamples = 5
@@ -32,10 +32,10 @@ const pitchesNotCollidingWithTheFillerPitches = [
  * @type {*[{ pitch: number, sample: AudioBuffer }][]}
  */
 let samplePattern = [
-  [],[],[],[],
-  [],[],[],[],
-  [],[],[],[],
-  [],[],[],[]
+  [], [], [], [],
+  [], [], [], [],
+  [], [], [], [],
+  [], [], [], []
 ]
 
 let effectPattern = [
@@ -48,17 +48,14 @@ let effectPattern = [
 export const aConservativeSeed = {
   // boom chack boom-boom chack
   notes: [
-    { pitch: DRUM_TO_PITCH.kick, startTime: 0,   endTime: 0.25 },
-    { pitch: DRUM_TO_PITCH.snare, startTime: 0.25, endTime: 0.5 },
-    { pitch: DRUM_TO_PITCH.kick, startTime: 0.5, endTime: 0.75 },
-    { pitch: DRUM_TO_PITCH.kick, startTime: 0.625, endTime: 0.75 },
-    { pitch: DRUM_TO_PITCH.snare, startTime: 0.75, endTime: 1.0 },
+    {pitch: DRUM_TO_PITCH.kick, startTime: 0, endTime: 0.25},
+    {pitch: DRUM_TO_PITCH.snare, startTime: 0.25, endTime: 0.5},
+    {pitch: DRUM_TO_PITCH.kick, startTime: 0.5, endTime: 0.75},
+    {pitch: DRUM_TO_PITCH.kick, startTime: 0.625, endTime: 0.75},
+    {pitch: DRUM_TO_PITCH.snare, startTime: 0.75, endTime: 1.0},
   ],
   totalTime: 1.0,
 }
-
-
-
 
 
 /**
@@ -77,16 +74,17 @@ export const aConservativeSeed = {
  * @param sample
  * @param scheduleSample {(index: number, sample: AudioBuffer) => void}
  * @param clearSample {(sample: AudioBuffer) => void}
+ * @param classification {string}
  */
-export async function addNewRecordedSample(sample, scheduleSample, clearSample) {
-  const index = ++nextSample % maxSamples
-  const ghostPitch = goodFillerPitches[index]
+export async function addNewRecordedSample(sample, scheduleSample, clearSample, classification = MAGENTA_DRUM_CLASSES.percussive) {
+  const suitableGhostPitches = GHOST_PITCHES_BY_CLASS[classification]
+  const ghostPitch = suitableGhostPitches[Math.floor(Math.random() * suitableGhostPitches.length)]
 
   samplePattern = clearPitchFromPattern(ghostPitch, samplePattern, clearSample)
   const seed = makeSeedWithGhostPitchFromPattern(ghostPitch, samplePattern, 2);
   const quantizedStartSteps = await getQuantizedStartStepsForPitch(seed, ghostPitch)
   quantizedStartSteps.forEach(quantizedStartStep => {
-    samplePattern[quantizedStartStep].push({ pitch: ghostPitch, sample })
+    samplePattern[quantizedStartStep].push({pitch: ghostPitch, sample})
     scheduleSample(quantizedStartStep, sample)
   })
 }
@@ -145,9 +143,6 @@ const clearPitchFromPattern = (pitch, pattern, callBackWithSampleWhenPitchIsFoun
 }
 
 
-
-
-
 /**
  * Make a seed from a pattern, introducing a ghost pitch at "boring" intervals to it
  * @param ghostPitch {number}
@@ -160,9 +155,6 @@ const makeSeedWithGhostPitchFromPattern = (ghostPitch, pattern, timesToAddGhostP
   const ghostNotesToAdd = evenlySpacedPartitions(timesToAddGhostPitch).map(t => patternEntryToSeedEntry(ghostPitch, t))
   return seedFromSeedEntries(oldNotes, ghostNotesToAdd)
 }
-
-
-
 
 
 /**
@@ -189,9 +181,6 @@ const getQuantizedStartStepsForPitch = async (seed, pitch, temperature = 1.5) =>
 }
 
 
-
-
-
 /**
  * Randomly set some quantizedStartSteps for a pitch
  * @param pitch {number}
@@ -207,9 +196,6 @@ const randomlyAssignQuantizedStartSteps = (pitch, meanNumberOfTimesToAdd, stddev
 }
 
 
-
-
-
 /**
  * Map a pattern entry to a magenta seed entry
  * @param pitch {number}
@@ -221,9 +207,6 @@ const patternEntryToSeedEntry = (pitch, index) => ({
   startTime: index / 16.0,
   endTime: Math.min(index / 16 + 0.5, 1.0)
 })
-
-
-
 
 
 /**

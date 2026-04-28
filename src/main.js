@@ -88,8 +88,8 @@ async function start() {
     })
 
   recordingChain.startRecordingSamples(
-    newRecordedSample => {
-      addNewRecordedSample(newRecordedSample, scheduleSample, clearSample)
+    (newRecordedSample, classification) => {
+      addNewRecordedSample(newRecordedSample, scheduleSample, clearSample, classification)
       resetCreep()
     })
   hideLoader()

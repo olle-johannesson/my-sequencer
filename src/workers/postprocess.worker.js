@@ -4,6 +4,7 @@ import {applyEnvelope} from "../dsp/envelope.js";
 import {createNoiseSpectrumMailboxViews} from "../util/mailbox.js";
 import {createHannWindow} from "../dsp/hannWindow.js";
 import {wienerDenoiseBuffer} from "../dsp/wienerFilter.js";
+import {classify} from "../dsp/classify.js";
 
 let noiseMailbox, fftSize, hopSize, hannWindow, localNoiseSpectrum, lastNoiseSeq, sampleRate;
 
@@ -63,8 +64,9 @@ self.onmessage = (e) => {
       const processed = new Float32Array(deNoised.length);
       processed.set(deNoised);
       applyEnvelope(processed, sampleRate);
+      const classification = classify(processed, sampleRate, Meyda)
 
-      self.postMessage({samples: processed, sampleRate}, [processed.buffer]);
+      self.postMessage({samples: processed, sampleRate, classification}, [processed.buffer]);
     }
   }
 };
