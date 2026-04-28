@@ -1,5 +1,6 @@
 export function createMicrophoneStream() {
   return navigator.mediaDevices.getUserMedia({
+    // TODO: settings?
     audio: {
       channelCount: 2,
       echoCancellation: true,

@@ -16,7 +16,9 @@ export async function setupAudioContext() {
 
 export function startAudioContext() {
   return new (window.AudioContext || window.webkitAudioContext)({
-    latencyHint: 'interactive'
+    latencyHint: 'playback'
+    // TODO: setting?
+    // latencyHint: 'interactive'
   });
 }
 
