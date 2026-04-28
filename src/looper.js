@@ -49,9 +49,12 @@ export function setBpm(newBpm) {
   }
 }
 
-export function startLoop(audioContext, outputNode, samplePattern, drumPattern, callbacks = {}) {
+let lastEffect = null
+
+export function startLoop(audioContext, outputNode, samplePattern, drumPattern, effectPattern, callbacks = {}) {
   isRunning = true
-  scheduler(audioContext, outputNode, samplePattern, drumPattern, callbacks)
+  lastEffect = null
+  scheduler(audioContext, outputNode, samplePattern, drumPattern, effectPattern, callbacks)
 }
 
 export function stopLoop() {
@@ -59,15 +62,16 @@ export function stopLoop() {
   currentStep = 0
   currentBar = 0
   nextStepTime = undefined
+  lastEffect = null
 }
 
-function scheduler(audioContext, outputNode, samplePattern, drumPattern, callbacks = {}) {
+function scheduler(audioContext, outputNode, samplePattern, drumPattern, effectPattern, callbacks = {}) {
   if (!isRunning) {
     return
   }
 
   if (nextStepTime === undefined) {
-    nextStepTime = audioContext?.currentTime + 0.1;
+    nextStepTime = audioContext?.currentTime + 0.25;
   }
 
   while (nextStepTime < audioContext.currentTime + scheduleAheadTime) {
@@ -99,6 +103,12 @@ function scheduler(audioContext, outputNode, samplePattern, drumPattern, callbac
 
     const swingDelay = swingByStep[currentStep % swingByStep.length] * calculateStepDuration()
     const stepPlayTime = nextStepTime + swingDelay
+
+    const currentEffect = effectPattern?.[currentStep] ?? null
+    if (currentEffect !== lastEffect && typeof callbacks.onEffectChange === 'function') {
+      callbacks.onEffectChange(currentEffect, lastEffect, stepPlayTime)
+    }
+    lastEffect = currentEffect
 
     ;[...samplesToPlay, ...drumsToPlay].forEach(job => job(stepPlayTime))
 

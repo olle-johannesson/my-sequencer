@@ -55,15 +55,30 @@ async function start() {
     masterBus.in,
     samplePattern,
     drumPattern,
-    { beforeEachCycle: barNumber => {
-      if (barNumber % 2 === 0) {
-        updateDrumPattern()
-      }
+    effectPattern,
+    {
+      beforeEachCycle: barNumber => {
+        if (barNumber % 2 === 0) {
+          updateDrumPattern()
+        }
 
-      if (samplePatternAge > 1) {
-        rescheduleOneOfTheRecordedSamples(scheduleSample, clearSample)
-      }
-    }})
+        if (barNumber % 4 === 0) {
+          updateEffectPattern(effectKeys)
+        }
+
+        if (samplePatternAge > 1) {
+          rescheduleOneOfTheRecordedSamples(scheduleSample, clearSample)
+        }
+      },
+      onEffectChange: (newFx, _oldFx, time) => {
+        if (newFx) {
+          const def = typeof newFx === 'string' ? allPresets[newFx] : newFx
+          if (def) effectSwitch.activate(def.chain, def.preset, time, masterBus.in, masterBus.out)
+        } else {
+          effectSwitch.deactivate(time)
+        }
+      },
+    })
 
   recordingChain.startRecordingSamples(
     newRecordedSample => addNewRecordedSample(newRecordedSample, scheduleSample, clearSample))
