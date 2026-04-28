@@ -7,7 +7,13 @@ import {getMicrophoneStream} from "./audio/microphoneInput.js";
 import {setupRecordingChain} from "./audio/recordingChain.js";
 import {loadAudioWorklets, pauseAudioContext, startAudioContext} from "./audio/audioSetup.js";
 import {clearAllDrums, drumPattern, initDrumPattern, updateDrumPattern} from "./patterns/drumPattern.js";
-import {clearAllEffects} from "./patterns/effectPattern.js";
+import {clearAllEffects, effectPattern, updateEffectPattern} from "./patterns/effectPattern.js";
+import {allPresets} from "./effects/effectSwitch.js";
+import {setDiagnostic} from "./ui/messages.js";
+import {startMainThreadMonitor} from "./dev/mainThreadMonitor.js";
+
+const effectKeys = Object.keys(allPresets)
+startMainThreadMonitor()
 import {startLoop, stopLoop} from "./looper.js";
 import {cancelAllScheduled} from "./audio/samplePlayer.js";
 import {attachEventListenersToAudioToggle, resetIsRecording, showIsRecording, showLoader} from "./ui/audioToggle.js";
@@ -28,6 +34,9 @@ async function start() {
     recordingChain.microphoneInputNode = newMicNode
   } else {
     audioContext = await startAudioContext()
+    setDiagnostic('outputLatency ms', audioContext.outputLatency * 1000)
+    setDiagnostic('baseLatency ms', audioContext.baseLatency * 1000)
+    setDiagnostic('sampleRate', audioContext.sampleRate)
     await loadAudioWorklets(audioContext);
 
     [microphoneStream, effectSwitch, masterBus] = await Promise.all([
@@ -44,8 +53,8 @@ async function start() {
         onRecordStop: resetIsRecording
       })
 
-    setupEffectButtons(audioContext, masterBus.in, masterBus.out)
-    createPresetTuner(effectSwitch, audioContext, masterBus.in, masterBus.out)
+    // setupEffectButtons(audioContext, masterBus.in, masterBus.out)
+    // createPresetTuner(effectSwitch, audioContext, masterBus.in, masterBus.out)
   }
 
   await initDrumPattern(audioContext)

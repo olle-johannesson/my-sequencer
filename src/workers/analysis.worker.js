@@ -85,6 +85,28 @@ function postNoiseModelToMailbox() {
  */
 setInterval(postNoiseModelToMailbox, 1000)
 
+// rolling timing — posted up to main thread periodically so we can render it on-screen.
+let lastTickTime = null
+let interMessageMs = 0
+let extractMs = 0
+let blocksProcessed = 0
+let extractMaxMs = 0
+
+setInterval(() => {
+  if (blocksProcessed === 0) return
+  self.postMessage({
+    type: 'timing',
+    extractAvgMs: extractMs / blocksProcessed,
+    extractMaxMs,
+    interMessageAvgMs: interMessageMs / blocksProcessed,
+    blocksProcessed,
+  })
+  interMessageMs = 0
+  extractMs = 0
+  blocksProcessed = 0
+  extractMaxMs = 0
+}, 500)
+
 /**
  * Deciding whether to record or not.
  * To start recording, the rms must be higher than a set minimum (adapted
@@ -147,6 +169,11 @@ onmessage = async (e) => {
     // And finally, we write the extracted features and recording state to the feature mailbox.
     case 'data': {
       const block = data.audio;
+      const now = performance.now()
+      if (lastTickTime !== null) interMessageMs += (now - lastTickTime)
+      lastTickTime = now
+      const t0 = now
+
       if (!previousBlock) { previousBlock = block; }
 
       let {
@@ -195,6 +222,12 @@ onmessage = async (e) => {
       Atomics.store(featureMailbox.i32, 0, nextSeq);
 
       previousBlock = block;
+
+      const dt = performance.now() - t0
+      extractMs += dt
+      if (dt > extractMaxMs) extractMaxMs = dt
+      blocksProcessed++
+
       break;
     }
   }

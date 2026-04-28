@@ -1,11 +1,24 @@
 import {audioBufferFromSAB} from "../dsp/audioBufferFromFloatArray.js";
 import {FEATURE_COUNT} from "../util/mailbox.js";
-import {scheduleSample} from "../patterns/effectPattern.js";
+import {scheduleEffect as scheduleSample} from "../patterns/effectPattern.js";
 import {clearSample} from "../patterns/samplePattern.js";
 import {analysisBlockSize, spectrumSize} from '../config.js'
+import {chartDiagnostic, setDiagnostic} from '../ui/messages.js'
 
 const analysisWorker = new Worker(new URL('../workers/analysis.worker.js', import.meta.url), {type: 'module'});
 analysisWorker.onerror = (e) => console.error('analysis worker error', e);
+analysisWorker.addEventListener('message', (e) => {
+  if (e.data?.type === 'timing') {
+    const {extractAvgMs, extractMaxMs, blocksProcessed, interMessageAvgMs} = e.data
+    const saturation = extractAvgMs / Math.max(interMessageAvgMs, 1) // 1.0 = worker barely keeping up; >1.0 = falling behind
+    const color = saturation < 0.5 ? '#7e7' : saturation < 0.8 ? '#ee7' : '#f55'
+    chartDiagnostic('analysis load %', saturation * 100, color)
+    setDiagnostic('analysis avg ms', extractAvgMs)
+    setDiagnostic('analysis max ms', extractMaxMs)
+    setDiagnostic('analysis blocks/0.5s', blocksProcessed)
+    setDiagnostic('inter-msg avg ms', interMessageAvgMs)
+  }
+});
 
 const postProcessWorker = new Worker(new URL('../workers/postprocess.worker.js', import.meta.url), {type: 'module'});
 postProcessWorker.onerror = (e) => console.error('post-process Worker error', e);
@@ -76,13 +89,14 @@ export async function setupRecordingChain(audioContext, microphoneStream, callBa
   hp.frequency.value = 80;
 
   const comp = audioContext.createDynamicsCompressor();
-  comp.threshold.value = -18;
-  comp.ratio.value = 3;
+  comp.threshold.value = -20;
+  comp.knee.value = 18;
+  comp.ratio.value = 3.5;
   comp.attack.value = 0.005;
   comp.release.value = 0.2;
 
   const recordGain = audioContext.createGain();
-  recordGain.gain.value = 0.8;
+  recordGain.gain.value = 1.0;
 
   // Wire up input chain
   microphoneInputNode
