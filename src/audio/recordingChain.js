@@ -77,7 +77,6 @@ export async function setupRecordingChain(audioContext, microphoneStream, callBa
 
   const comp = audioContext.createDynamicsCompressor();
   comp.threshold.value = -18;
-  comp.knee.value = 24;
   comp.ratio.value = 3;
   comp.attack.value = 0.005;
   comp.release.value = 0.2;
