@@ -28,8 +28,8 @@ export function startMainThreadMonitor() {
   setInterval(() => {
     const lagColor  = maxLagMs   < 20 ? '#7e7' : maxLagMs   < 60 ? '#ee7' : '#f55'
     const stallColor = stallCount === 0 ? '#7e7' : stallCount < 3 ? '#ee7' : '#f55'
-    chartDiagnostic('main max stall ms', maxLagMs, lagColor)
-    setDiagnostic('main stalls/1s', stallCount, stallColor)
+    chartDiagnostic('thread max stall ms', maxLagMs, lagColor)
+    setDiagnostic('main thread stalls/1s', stallCount, stallColor)
     maxLagMs = 0
     stallCount = 0
   }, WINDOW_MS)

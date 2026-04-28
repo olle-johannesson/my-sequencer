@@ -8,7 +8,7 @@ import {loadAudioWorklets, pauseAudioContext, startAudioContext} from "./audio/a
 import {clearAllDrums, drumPattern, initDrumPattern, updateDrumPattern} from "./patterns/drumPattern.js";
 import {clearAllEffects, effectPattern, updateEffectPattern} from "./patterns/effectPattern.js";
 import {creepEffectChance, creepIntensity, resetCreep} from "./patterns/creep.js";
-import {setDiagnostic} from "./ui/messages.js";
+import {setDiagnostic, sparkline} from "./ui/messages.js";
 import {startMainThreadMonitor} from "./dev/mainThreadMonitor.js";
 import {startLoop, stopLoop} from "./looper.js";
 import {cancelAllScheduled} from "./audio/samplePlayer.js";
@@ -17,6 +17,66 @@ import {spectrumSize} from "./config.js";
 
 const effectKeys = Object.keys(allPresets)
 startMainThreadMonitor()
+
+// Group classifications into rough sonic families for at-a-glance UI feedback.
+//   green  = low-frequency / body
+//   orange = midrange / snappy
+//   blue   = bright / airy
+//   purple = sustained / shimmery
+const CLASSIFICATION_COLORS = {
+  BASSY:        '#5a9',
+  RUMBLY_LOW:   '#5a9',
+  RUMBLY_MID:   '#5a9',
+  RUMBLY_HIGH:  '#5a9',
+  SNAPPY:       '#e95',
+  PERCUSSIVE:   '#e95',
+  BRIGHT:       '#9bd',
+  AIRY:         '#9bd',
+  CYMBAL_CRASH: '#9bd',
+  SUSTAINED:    '#a7e',
+}
+const classificationColor = c => CLASSIFICATION_COLORS[c] ?? '#aaa'
+
+// Establish display order in the diagnostic panel by seeding keys at module
+// load. setDiagnostic preserves existing keys' insertion order on update, so
+// later real values just fill these in without reshuffling.
+//   1. figures (numbers)
+//   2. recorded-sample sparklines
+//   3. line charts (chartDiagnostic — those are separate DOM rows below the pre)
+const FIGURE_KEYS = [
+  'outputLatency ms',
+  'baseLatency ms',
+  'sampleRate',
+  'main thread stalls/1s',
+  'analysis avg ms',
+  'analysis max ms',
+  'analysis blocks/0.5s',
+  'inter-msg avg ms',
+]
+for (const key of FIGURE_KEYS) setDiagnostic(key, '—', '#666')
+
+// 5-deep FIFO of recorded-sample rows in the diagnostics panel. Each new
+// recording lands in the next slot (cycling), so all five stay visible
+// permanently after the first five recordings.
+const SAMPLE_SLOTS = 5
+let sampleSlotIndex = 0
+for (let i = 0; i < SAMPLE_SLOTS; i++) {
+  setDiagnostic(`sample ${i}`, '— empty —', '#444')
+}
+
+function showSampleInSlot(classification, features, color) {
+  const items = [
+    {value: features.duration,         max: 2},
+    {value: features.decayTime,        max: 1},
+    {value: features.lowRatio,         max: 1},
+    {value: features.highRatio,        max: 1},
+    {value: features.spectralCentroid, max: 10000},
+    {value: features.spectralFlatness, max: 1},
+  ]
+  const slot = sampleSlotIndex % SAMPLE_SLOTS
+  sampleSlotIndex++
+  setDiagnostic(`sample ${slot}`, `${classification.padEnd(13)} ${sparkline(items)}`, color)
+}
 
 
 let audioContext, microphoneStream, effectSwitch, /*drumSamples,*/ recordingChain, masterBus, hideLoader

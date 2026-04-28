@@ -7,6 +7,10 @@ const HISTORY = 120
 const CHART_W = 240
 const CHART_H = 32
 
+// Sparkline alphabet (Sindre Sorhus / classic). Each char encodes one of 8
+// vertical levels — perfect for inline single-line bar charts.
+const SPARK_CHARS = '▁▂▃▄▅▆▇█'
+
 /**
  * @param {string} key
  * @param value
@@ -15,6 +19,56 @@ const CHART_H = 32
 export function setDiagnostic(key, value, color) {
   state[key] = { value, color }
   renderText()
+}
+
+/**
+ * Like setDiagnostic, but also renders a teenie-weenie unicode-block bar
+ * scaled to `max`. Use for at-a-glance level reads next to the numeric value.
+ * @param {string} key
+ * @param {number} value
+ * @param {number} [max=1]
+ * @param {string} [color]
+ */
+export function setBarDiagnostic(key, value, max = 1, color) {
+  state[key] = { value, color, bar: { max } }
+  renderText()
+}
+
+const BAR_WIDTH = 12
+const BAR_FILLED = '█'
+const BAR_EMPTY = '·'
+
+function makeBar(value, max) {
+  const ratio = Math.max(0, Math.min(1, max > 0 ? value / max : 0))
+  const fill = Math.round(ratio * BAR_WIDTH)
+  return BAR_FILLED.repeat(fill) + BAR_EMPTY.repeat(BAR_WIDTH - fill)
+}
+
+/**
+ * Build a unicode sparkline string — `▁▂▃▄▅▆▇█`. One char per item, height
+ * encodes value/max. Useful when you want to compose it into a richer row
+ * (e.g. prefix it with a label or classification name).
+ * @param {Array<{value: number, max: number}>} items
+ * @returns {string}
+ */
+export function sparkline(items) {
+  return items.map(it => sparkChar(it.value, it.max)).join('')
+}
+
+/**
+ * Render the items as a sparkline row in the panel.
+ * @param {string} key   - row label
+ * @param {Array<{value: number, max: number}>} items
+ * @param {string} [color]
+ */
+export function setBarsDiagnostic(key, items, color) {
+  setDiagnostic(key, sparkline(items), color)
+}
+
+function sparkChar(value, max) {
+  const ratio = Math.max(0, Math.min(1, max > 0 ? value / max : 0))
+  const idx = Math.round(ratio * (SPARK_CHARS.length - 1))
+  return SPARK_CHARS[idx]
 }
 
 /**
@@ -38,9 +92,11 @@ function renderText() {
   if (keys.length === 0) { pre.textContent = ''; return }
   const longest = Math.max(...keys.map(k => k.length))
   pre.replaceChildren(...keys.map(k => {
-    const { value, color } = state[k]
+    const { value, color, bar } = state[k]
     const line = document.createElement('div')
-    line.textContent = `${k.padEnd(longest)}  ${format(value)}`
+    line.textContent = bar
+      ? `${k.padEnd(longest)}  ${makeBar(value, bar.max)}  ${format(value)}`
+      : `${k.padEnd(longest)}  ${format(value)}`
     if (color) line.style.color = color
     return line
   }))
