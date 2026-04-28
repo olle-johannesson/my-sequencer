@@ -125,6 +125,6 @@ function scheduler(audioContext, outputNode, samplePattern, drumPattern, callbac
     nextStepTime += calculateStepDuration();
   }
 
-  requestAnimationFrame(() => scheduler(audioContext, outputNode, samplePattern, drumPattern, callbacks));
+  setTimeout(() => scheduler(audioContext, outputNode, samplePattern, drumPattern, effectPattern, callbacks), 10);
 }
 
