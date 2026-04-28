@@ -2,7 +2,6 @@ import {continuePattern} from "./magentaHelper.js";
 import {getNormallyDistributedNumber} from "./util/random.js";
 import {evenlySpacedPartitions} from "./util/evenlySpacedPartitions.js";
 import {DRUM_TO_PITCH} from "./drums/drumNameMaps.js";
-import {clearSample} from "./patterns/samplePattern.js";
 
 const maxAttemptsToScheduleNewSample = 5
 const maxSamples = 5

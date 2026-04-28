@@ -1,6 +1,7 @@
 import {continuePattern, quantizeSeed} from "../magentaHelper.js";
-import {PITCH_TO_DRUM} from "../drums/drumNameMaps.js";
+import {DRUM_TO_PITCH, PITCH_TO_DRUM} from "../drums/drumNameMaps.js";
 import {setBpm, setSwing} from "../looper.js";
+import {creepRevertChance, creepTemperature, resetCreep, tickCreep} from "./creep.js";
 import {
   aBoomBapSeed,
   aDiscoPopSeed,
@@ -11,12 +12,15 @@ import {
   aRosannaAdjacentSeed
 } from "../drums/beats/index.js";
 import {funkySeedPresets} from "../drums/beats/presets.js";
+import {loadSample} from "../drums/loadSample.js";
 
+let kit
 let scheduledDrums = [...new Array(16)].map(() => new Set())
+let seedPattern        // the freshly quantized seed, kept around so we can snap back to it
 let currentPattern
 let nextPattern
 let nextOnsets
-let loadedDrumSamples
+let loadedDrumSamples = {}
 
 export {scheduledDrums as drumPattern}
 
@@ -69,41 +73,75 @@ const DRUM_FALLBACK_CHAIN = {
   tomLow: ['tomMid', 'tomHigh'],
 }
 
-function resolveDrum(kit, drumName) {
-  if (kit[drumName]) return kit[drumName]
+async function resolveDrum(audioContext, kit, drumPitch) {
+  const drumName = PITCH_TO_DRUM[drumPitch]
+  if (!drumName) return undefined
+
+  if (kit.drums[drumName]) {
+    if (loadedDrumSamples[drumPitch]) return loadedDrumSamples[drumPitch]
+    const mod = await kit.drums[drumName]()
+    const url = mod.default ?? mod
+    const sample = await loadSample(audioContext, url)
+    loadedDrumSamples[drumPitch] = sample
+    return sample
+  }
+
   for (const fallback of DRUM_FALLBACK_CHAIN[drumName] ?? []) {
-    if (kit[fallback]) return kit[fallback]
+    if (kit.drums[fallback]) {
+      return resolveDrum(audioContext, kit, DRUM_TO_PITCH[fallback])
+    }
   }
   return undefined
 }
 
 export async function initDrumPattern(audioContext) {
-  let preset = funkySeedPresets[Math.floor(Math.random() * funkySeedPresets.length)]
-  loadedDrumSamples = await preset.loadKit(audioContext)
-  currentPattern = await quantizeSeed(preset.seed)
+  const preset = funkySeedPresets[Math.floor(Math.random() * funkySeedPresets.length)]
+  console.log('selected beat', preset.name)
+
+  // Reset the per-slot sample cache when we (re)bind to a kit — otherwise a
+  // previously-loaded sample under a slot would shadow this kit's version.
+  if (kit !== preset.kit) {
+    loadedDrumSamples = {}
+    kit = preset.kit
+  }
+  resetCreep()
+
+  seedPattern = await quantizeSeed(preset.seed)
+  currentPattern = seedPattern
   setSwing(preset.swing)
   setBpm(preset.bpm)
 
-  nextPattern = await continuePattern(currentPattern, 1)
-  nextOnsets = toSampleOnsets(nextPattern)
+  nextPattern = await continuePattern(currentPattern, creepTemperature())
+  nextOnsets = await toSampleOnsets(audioContext, kit, nextPattern)
   setDrumpattern(nextOnsets)
 }
 
-export async function updateDrumPattern() {
+export async function updateDrumPattern(audioContext) {
   if (nextOnsets) {
     setDrumpattern(nextOnsets)
   }
 
+  tickCreep()
   currentPattern = nextPattern
-  nextPattern = await continuePattern(nextPattern, 1)
-  nextOnsets = toSampleOnsets(nextPattern)
+
+  if (Math.random() < creepRevertChance()) {
+    // exhale: snap back to the seed and start fresh
+    console.log('creep revert')
+    nextPattern = seedPattern
+    resetCreep()
+  } else {
+    nextPattern = await continuePattern(nextPattern, creepTemperature())
+  }
+
+  nextOnsets = await toSampleOnsets(audioContext, kit, nextPattern)
 }
 
-export function toSampleOnsets(pattern) {
-  return pattern.notes
-    .map(note => ({drum: PITCH_TO_DRUM[note.pitch], onset: note.quantizedStartStep}))
-    .filter(n => n.drum)
-    .map(n => ({...n, drum: resolveDrum(loadedDrumSamples, n.drum)}))
+export async function toSampleOnsets(audioContext, kit, pattern) {
+  const pitchesAndOnsets = pattern.notes
+    .map(note => ({ pitch: note.pitch, onset: note.quantizedStartStep }))
+    .filter(n => PITCH_TO_DRUM.hasOwnProperty(n.pitch))
+  return (await Promise.all(pitchesAndOnsets.map(n => resolveDrum(audioContext, kit, n.pitch))))
+    .map((sample, index) => ({ drum: sample, onset: pitchesAndOnsets[index].onset }))
     .filter(n => n.drum)
 }
 

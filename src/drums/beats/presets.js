@@ -1,13 +1,13 @@
-import {loadKawaii} from "../loaders/loadKawaii.js";
-import {loadSDS5} from "../loaders/loadSDS5.js";
-import {loadCR78} from "../loaders/loadCR78.js";
-import {loadLINN9000} from "../loaders/loadLINN9000.js";
-import {loadLN2} from "../loaders/loadLN2.js";
-import {loadTR808} from "../loaders/loadTR808.js";
-import {loadDrumulator} from "../loaders/loadDrumulator.js";
-import {loadSP12} from "../loaders/loadSP12.js";
-import {loadR8} from "../loaders/loadR8.js";
-import {loadRX5} from "../loaders/loadRX5.js";
+import {Kawaii} from "../kits/Kawaii.js";
+import {SDS5} from "../kits/SDS5.js";
+import {CR78} from "../kits/CR78.js";
+import {LINN9000} from "../kits/LINN9000.js";
+import {LN2} from "../kits/LN2.js";
+import {TR808} from "../kits/TR-808.js";
+import {Drumulator} from "../kits/Drumulator.js";
+import {SP12} from "../kits/SP12.js";
+import {R8} from "../kits/R8.js";
+import {RX5} from "../kits/RX5.js";
 import {DRUM_TO_PITCH} from "../drumNameMaps.js";
 
 const note = (pitch, startTime, duration) => ({pitch: DRUM_TO_PITCH[pitch], startTime, endTime: startTime + duration})
@@ -25,7 +25,7 @@ const th = t => note('tomHigh', t, 0.10)
 export const funkySeedPresets = [
   {
     name: 'Linn Pocket',
-    loadKit: loadLINN9000,
+    kit: LINN9000,
     bpm: 96,
     seed: {
       notes: [
@@ -52,7 +52,7 @@ export const funkySeedPresets = [
 
   {
     name: 'CR78 Tight Machine Funk',
-    loadKit: loadCR78,
+    kit: CR78,
     bpm: 100,
     seed: {
       notes: [
@@ -77,7 +77,7 @@ export const funkySeedPresets = [
 
   {
     name: 'SDS Broken Funk',
-    loadKit: loadSDS5,
+    kit: SDS5,
     bpm: 104,
     seed: {
       notes: [
@@ -101,7 +101,7 @@ export const funkySeedPresets = [
 
   {
     name: 'Kawaii Skip Bounce',
-    loadKit: loadKawaii,
+    kit: Kawaii,
     bpm: 108,
     seed: {
       notes: [
@@ -126,7 +126,7 @@ export const funkySeedPresets = [
 
   {
     name: '808 Billie Jean Pocket',
-    loadKit: loadTR808,
+    kit: TR808,
     bpm: 96,
     seed: {
       notes: [
@@ -143,7 +143,7 @@ export const funkySeedPresets = [
 
   {
     name: 'Drumulator Rosanna Pocket',
-    loadKit: loadDrumulator,
+    kit: Drumulator,
     bpm: 86,
     swing: [
       0, 0.2, 0, 0.3,
@@ -166,7 +166,7 @@ export const funkySeedPresets = [
 
   {
     name: 'SP-12 Lust for Life',
-    loadKit: loadR8,
+    kit: R8,
     bpm: 104,
     swing: [
       0,0.1,0,0.1,
@@ -190,7 +190,7 @@ export const funkySeedPresets = [
 
   {
     name: 'R8 Bonham Bombs',
-    loadKit: loadR8,
+    kit: R8,
     bpm: 92,
     seed: {
       notes: [
@@ -207,7 +207,7 @@ export const funkySeedPresets = [
 
   {
     name: '808 Pocket Strut',
-    loadKit: loadTR808,
+    kit: TR808,
     bpm: 92,
     seed: {
       notes: [
@@ -230,7 +230,7 @@ export const funkySeedPresets = [
 
   {
     name: 'R8 12/8 Slow Shuffle',
-    loadKit: loadR8,
+    kit: R8,
     bpm: 52,
     swing: [
       0, 0.2, 0, 0.2,
