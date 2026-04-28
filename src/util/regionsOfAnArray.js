@@ -1,4 +1,4 @@
-import {getNormallyDistributedNumber} from "../../../../../dev/my-sequencer/src/util/random";
+import {getNormallyDistributedNumber} from "./random.js";
 
 const rndIndex = a => Math.random() * a.length | 0
 const rndIndexThatsTruthy = a => {
@@ -9,15 +9,15 @@ const rndIndexThatsTruthy = a => {
   return -1
 }
 
-const addARandomRegion = (a, value) => {
+export const addARandomRegion = (a, value) => {
   let i = rndIndex(a)
   let len = getNormallyDistributedNumber(0, 3)
   let start = i
   let end = (i + Math.abs(Math.round(len))) % a.length
-  return addARegion(a,start,end,value)
+  return addARegion(a, start, end, value)
 }
 
-let addARegion = (a, start, end, value) => {
+export const addARegion = (a, start, end, value) => {
   const b = a.slice()
   const len = b.length
 
@@ -30,7 +30,7 @@ let addARegion = (a, start, end, value) => {
   return b
 }
 
-const removeRandomRegion = a => {
+export const removeRandomRegion = a => {
   const incr = x => (x + 1) % a.length
   const decr = x => (x - 1 + a.length) % a.length
   const i = rndIndexThatsTruthy(a)
