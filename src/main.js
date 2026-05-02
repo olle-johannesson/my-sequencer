@@ -6,6 +6,7 @@ import {getMicrophoneStream, setMicDeviceId} from "./audio/microphoneInput.js";
 import {populateInputSources, setupInputSourceSelect} from "./ui/inputSourceSelect.js";
 import {audioFeatureSAB, setupRecordingChain} from "./audio/recordingChain.js";
 import {setupInputMeter} from "./ui/inputMeter.js";
+import {getFilterAmount, setupSliders} from "./ui/sliders.js";
 import {loadAudioWorklets, pauseAudioContext, startAudioContext} from "./audio/audioSetup.js";
 import {clearAllDrums, drumPattern, initDrumPattern, updateDrumPattern} from "./patterns/drumPattern.js";
 import {clearAllEffects, effectPattern, updateEffectPattern} from "./patterns/effectPattern.js";
@@ -153,8 +154,16 @@ async function startInner() {
           updateDrumPattern(audioContext)
         }
 
-        if (Math.random() < creepEffectChance()) {
-          updateEffectPattern(effectKeys, creepIntensity())
+        // Filter slider has full authority over effect-pattern mutation.
+        // Slider 0 → never mutate (no effects). Slider 3 → mutate every bar
+        // at full intensity (radical, regions long, mostly adds, pattern
+        // saturates fast). Creep no longer contributes — at 0 the user
+        // genuinely gets a clean signal.
+        const filt = getFilterAmount() // 0..3
+        const chance    = filt / 3                  // 0..1
+        const intensity = Math.min(1, filt / 2)     // 0..1 (saturates at filt=2)
+        if (Math.random() < chance) {
+          updateEffectPattern(effectKeys, intensity)
         }
 
         if (samplePatternAge > 1) {
@@ -249,6 +258,7 @@ async function stop() {
 
 attachEventListenersToAudioToggle(start, stop)
 setupInputMeter(audioFeatureSAB)
+setupSliders()
 
 // Populate the input-source dropdown immediately (labels may be blank pre-permission)
 // and re-populate after the first start() so labels fill in.

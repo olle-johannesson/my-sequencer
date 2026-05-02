@@ -7,6 +7,16 @@ import {chartDiagnostic, setDiagnostic} from '../ui/messages.js'
 
 const analysisWorker = new Worker(new URL('../workers/analysis.worker.js', import.meta.url), {type: 'module'});
 analysisWorker.onerror = (e) => console.error('analysis worker error', e);
+
+/**
+ * Tell the analysis worker to scale its recording threshold. `value` is the
+ * raw slider position 0..1 with 0.5 as neutral. Mapped exponentially so the
+ * extremes are 4× harder/easier to trigger and the centre is unchanged.
+ */
+export function setSensitivity(value) {
+  const multiplier = Math.pow(4, 2 * value - 1) // 0→0.25, 0.5→1, 1→4
+  analysisWorker.postMessage({type: 'sensitivity', multiplier})
+}
 analysisWorker.addEventListener('message', (e) => {
   if (e.data?.type === 'timing') {
     const {extractAvgMs, extractMaxMs, blocksProcessed, interMessageAvgMs} = e.data

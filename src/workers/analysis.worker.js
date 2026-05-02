@@ -26,6 +26,11 @@ const MIN_FRAMES_ABOVE = 1;  // frames above start threshold to trigger
 const MIN_FRAMES_BELOW = 2; // frames below stop threshold to stop
 const hysteresisGate = createConsecutiveGate(MIN_FRAMES_ABOVE, MIN_FRAMES_BELOW);
 
+// User-adjustable scale on the noise-relative thresholds. 1.0 = default;
+// lower values = less sensitive (need more signal above noise to trigger),
+// higher values = more sensitive. Driven from the Input sensitivity slider.
+let sensitivityMultiplier = 1.0;
+
 
 /**
  * Update the noise model with the current frame's amplitude spectrum.'
@@ -125,8 +130,10 @@ setInterval(() => {
  * @return {number}
  */
 function recordingDecision(rms, flux, flatness, centroid) {
-  const startThreshold = rmsThreshold * START_FACTOR;
-  const stopThreshold  = rmsThreshold * STOP_FACTOR;
+  // Higher sensitivity = lower threshold (so quieter input triggers).
+  // Multiplier is inverse: 4x more sensitive halves the threshold.
+  const startThreshold = rmsThreshold * START_FACTOR / sensitivityMultiplier;
+  const stopThreshold  = rmsThreshold * STOP_FACTOR  / sensitivityMultiplier;
   // Reject if any DISCARD_PROFILE matches the current frame's features.
   // Profiles needing post-classify-only features (lowRatio, decayTime, …)
   // never match here — those undefined values fail every comparison.
@@ -165,6 +172,13 @@ onmessage = async (e) => {
       noiseMailbox = createNoiseSpectrumMailboxViews(data.noiseMailboxSAB, data.spectrumSize / 2)
       spectrumSize = data.spectrumSize / 2
       self.postMessage({type: 'ready'})
+      break
+    }
+
+    // Updates the sensitivity multiplier used inside recordingDecision.
+    // Safe to receive before 'init' — it just sets a top-level variable.
+    case 'sensitivity': {
+      sensitivityMultiplier = data.multiplier
       break
     }
 
