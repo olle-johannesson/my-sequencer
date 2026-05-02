@@ -50,10 +50,6 @@ html, body {
     font-family: system-ui, sans-serif;
 }
 
-html:has(#audio-toggle:checked) {
-    animation: disco-color-rotation 1200s linear infinite;
-}
-
 body::before {
     content: '';
     position: fixed;
@@ -146,11 +142,6 @@ body.audio-started:has(#audio-toggle:checked) #hold .icon-pause { opacity: 1; }
 
 @keyframes rotation {
     to { transform: rotate(360deg); }
-}
-
-@keyframes disco-color-rotation {
-    0%   { filter: hue-rotate(0deg); }
-    100% { filter: hue-rotate(360deg); }
 }
 
 #panels {
