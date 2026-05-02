@@ -26,7 +26,7 @@ postProcessWorker.onerror = (e) => console.error('post-process Worker error', e)
 //   addNewRecordedSample(audioBufferFromSAB(audioContext, e.data.samples), scheduleSample, clearSample)
 
 // shared buffers
-const audioFeatureSAB = new SharedArrayBuffer(
+export const audioFeatureSAB = new SharedArrayBuffer(
   Int32Array.BYTES_PER_ELEMENT + FEATURE_COUNT * Float32Array.BYTES_PER_ELEMENT
 );
 

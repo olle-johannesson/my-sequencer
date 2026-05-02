@@ -1,96 +1,87 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>Looper</title>
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
-    <input type="checkbox" id="audio-toggle" style="display: none;">
-
-    <label for="audio-toggle" id="hold" class="">
-
-      <!-- Frequency blob background -->
-      <svg id="freq-blob" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
-        <path id="blob-path" d="M 150.0 80.0 L 157.3 80.4 L 164.6 81.5 L 171.6 83.4 L 178.5 86.1 L 185.0 89.4 L 191.1 93.4 L 196.8 98.0 L 202.0 103.2 L 206.6 108.9 L 210.6 115.0 L 213.9 121.5 L 216.6 128.4 L 218.5 135.4 L 219.6 142.7 L 220.0 150.0 L 219.6 157.3 L 218.5 164.6 L 216.6 171.6 L 213.9 178.5 L 210.6 185.0 L 206.6 191.1 L 202.0 196.8 L 196.8 202.0 L 191.1 206.6 L 185.0 210.6 L 178.5 213.9 L 171.6 216.6 L 164.6 218.5 L 157.3 219.6 L 150.0 220.0 L 142.7 219.6 L 135.4 218.5 L 128.4 216.6 L 121.5 213.9 L 115.0 210.6 L 108.9 206.6 L 103.2 202.0 L 98.0 196.8 L 93.4 191.1 L 89.4 185.0 L 86.1 178.5 L 83.4 171.6 L 81.5 164.6 L 80.4 157.3 L 80.0 150.0 L 80.4 142.7 L 81.5 135.4 L 83.4 128.4 L 86.1 121.5 L 89.4 115.0 L 93.4 108.9 L 98.0 103.2 L 103.2 98.0 L 108.9 93.4 L 115.0 89.4 L 121.5 86.1 L 128.4 83.4 L 135.4 81.5 L 142.7 80.4 Z" fill="var(--button-color)"/>
-      </svg>
-
-      <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-      >
-        <!-- Headphone arch -->
-        <path d="M4 14v-2a8 8 0 0 1 16 0v2" />
-
-        <!-- Earcups -->
-        <rect x="4.5" y="11.8" width="3" height="7.5" rx="1.6" />
-        <rect x="16.5" y="11.8" width="3" height="7.5" rx="1.6" />
-
-        <!-- Microphone capsule -->
-        <rect x="9" y="9" width="6" height="9" rx="3" />
-
-        <!-- Mic grille -->
-        <line x1="10" y1="11"   x2="14" y2="11" />
-        <line x1="10" y1="13"   x2="14" y2="13" />
-        <line x1="10" y1="15"   x2="14" y2="15" />
-
-        <!-- Mic top bars -->
-        <line x1="11" y1="9.7" x2="11" y2="10.5" />
-        <line x1="12" y1="9.7" x2="12" y2="10.5" />
-        <line x1="13" y1="9.7" x2="13" y2="10.5" />
-
-        <!-- Stand -->
-        <line x1="12" y1="18" x2="12" y2="20" />
-
-        <!-- Base bar -->
-        <path d="M10 20h4" />
-
-        <!-- Foot -->
-        <path d="M9 21.5h6a2 2 0 0 1 2 2H7a2 2 0 0 1 2-2z" />
-      </svg>
-
-      <svg class="mic-star mic-star-1" viewBox="0 0 16 16">
-        <path d="M8 1.5 L9.2 4.2 L12 5 L9.2 5.8 L8 8.5 L6.8 5.8 L4 5 L6.8 4.2 Z"/>
-      </svg>
-
-      <svg class="mic-star mic-star-2" viewBox="0 0 16 16">
-        <path d="M8 1.5 L9.2 4.2 L12 5 L9.2 5.8 L8 8.5 L6.8 5.8 L4 5 L6.8 4.2 Z"/>
-      </svg>
-
-      <svg class="mic-star mic-star-3" viewBox="0 0 16 16">
-        <path d="M8 1.5 L9.2 4.2 L12 5 L9.2 5.8 L8 8.5 L6.8 5.8 L4 5 L6.8 4.2 Z"/>
-      </svg>
-
-      <svg class="mic-star mic-star-4" viewBox="0 0 16 16">
-        <path d="M8 1.5 L9.2 4.2 L12 5 L9.2 5.8 L8 8.5 L6.8 5.8 L4 5 L6.8 4.2 Z"/>
-      </svg>
-
-      <svg class="mic-star mic-star-5" viewBox="0 0 16 16">
-        <path d="M8 1.5 L9.2 4.2 L12 5 L9.2 5.8 L8 8.5 L6.8 5.8 L4 5 L6.8 4.2 Z"/>
-      </svg>
-
-      <div class="ripple-circles">
-        <div id="ripple-circle-1" class="ripple-circle ripple-circle-1"></div>
-        <div id="ripple-circle-2" class="ripple-circle ripple-circle-2"></div>
-        <div id="ripple-circle-3" class="ripple-circle ripple-circle-3"></div>
-      </div>
-
+    <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<main>
+    <!-- playsinline + webkit-playsinline keep iOS Safari/WebKit from hijacking
+         taps on the video into a fullscreen native-player view. muted is also
+         required for inline autoplay on iOS. -->
+    <video muted loop playsinline webkit-playsinline id="bkg-video">
+        <source src="/images/portrait/855909.mp4" type="video/mp4">
+    </video>
+    <!-- Play / pause toggle. The <label for=audio-toggle> handles the checkbox flip
+         natively; main.js's attachEventListenersToAudioToggle hooks the checkbox's
+         change event to fire start()/stop(). -->
+    <label for="audio-toggle" id="hold" aria-label="Play / pause">
+        <svg viewBox="0 0 24 24">
+            <!-- Three icons stacked; CSS opacity selects which is visible based on
+                 body classes (audio-started) and the #audio-toggle :checked state.
+                 Pre-first-start: mic, telling the user the next tap activates mic.
+                 Started + paused: play. Started + playing: pause. -->
+            <path class="icon icon-mic"   d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.49 6-3.31 6-6.72h-1.7z"/>
+            <path class="icon icon-play"  d="M8 5v14l11-7z"/>
+            <path class="icon icon-pause" d="M6 5h4v14H6zM14 5h4v14h-4z"/>
+        </svg>
     </label>
-    <div id="messages">
-      <pre class="message"></pre>
-    </div>
+    <section id="panels">
+        <details class="panel" id="controls">
+            <summary>Controls</summary>
+            <ul>
+                <li>
+                    <label for="input-source">Input source</label>
+                    <select id="input-source"></select>
+                </li>
+            <li>
+                <label for="sensisitivity-gauge">Input sensitivity</label>
+                <!-- Live RMS meter — shows current mic level so the user can see what
+                     sensitivity threshold to pick. low/high/optimum drive native
+                     coloring; CSS overrides paint our own theme colors. -->
+                <meter id="input-meter" min="0" max="0.5" low="0.02" high="0.3" optimum="0.12" value="0"></meter>
+                <input type="range" id="sensisitivity-gauge" class="slider" min="0.0" max="1.0" step="0.01" value="0.5"/>
+            </li>
+            <li>
+                <label for="filter-gauge">Filter amount</label>
+                <input type="range" id="filter-gauge" class="slider" min="0.0" max="3.0" step="0.01" value="1.0"/>
+            </li>
+            </ul>
+            <p class="privacy-note">
+                Audio runs entirely on your device, including the drum AI model. Your microphone input is never
+                uploaded anywhere. Recordings stay in memory and are discarded when you pause.
+            </p>
+        </details>
+        <details class="panel" id="messages">
+            <summary>Monitoring</summary>
+            <pre class="message"></pre>
+        </details>
+        <details class="panel" id="credits">
+            <summary>Credits</summary>
+            <h3>Video credits:</h3>
+            <ul>
+                <li><a href="https://www.pexels.com/@cottonbro/">cottonbro studio</a></li>
+                <li><a href="https://www.pexels.com/@Pixabay/">Pixabay</a></li>
+                <li><a href="https://www.pexels.com/@mootlak/">Emirkhan Bal</a></li>
+                <li><a href="https://www.pexels.com/@bank/">Rathaphon Nanthapreecha</a></li>
+                <li><a href="https://www.pexels.com/@stefan-239928581/">Stefan</a></li>
+                <li><a href="https://www.pexels.com/@madam-ma/">Madam M.A (Akari P.)</a></li>
+                <li><a href="https://www.pexels.com/@rdne/">RDNE Stock project</a></li>
+                <li><a href="https://www.pexels.com/@felipe-mottafx-283683556/">Felipe MottaFX</a></li>
+            </ul>
+            <br>
+            <br>
+            <h3><a href="https://www.olle.fyi">Made with ♥ by Olle</a></h3>
+    </details>
+    </section>
+</main>
+<input type="checkbox" id="audio-toggle" style="display: none;">
 
-    <!-- <script src="../node_modules/eruda/eruda.js"></script> -->
-    <!-- <script>eruda.init();</script> -->
+<!-- <script src="../node_modules/eruda/eruda.js"></script> -->
+<!-- <script>eruda.init();</script> -->
 
-    <script type="module" src="/src/main.js"></script>
-  </body>
+<script type="module" src="/src/main.js"></script>
+</body>
 </html>

@@ -2,8 +2,10 @@ import {allPresets, createEffectSwitch} from "./effects/effectSwitch.js";
 import {setupMasterBus} from "./audio/masterChain.js";
 import {addNewRecordedSample, rescheduleOneOfTheRecordedSamples} from "./patternMutation.js";
 import {clearAllSamples, clearSample, samplePattern, samplePatternAge, scheduleSample} from "./patterns/samplePattern.js";
-import {getMicrophoneStream} from "./audio/microphoneInput.js";
-import {setupRecordingChain} from "./audio/recordingChain.js";
+import {getMicrophoneStream, setMicDeviceId} from "./audio/microphoneInput.js";
+import {populateInputSources, setupInputSourceSelect} from "./ui/inputSourceSelect.js";
+import {audioFeatureSAB, setupRecordingChain} from "./audio/recordingChain.js";
+import {setupInputMeter} from "./ui/inputMeter.js";
 import {loadAudioWorklets, pauseAudioContext, startAudioContext} from "./audio/audioSetup.js";
 import {clearAllDrums, drumPattern, initDrumPattern, updateDrumPattern} from "./patterns/drumPattern.js";
 import {clearAllEffects, effectPattern, updateEffectPattern} from "./patterns/effectPattern.js";
@@ -14,7 +16,11 @@ import {startLoop, stopLoop} from "./looper.js";
 import {cancelAllScheduled} from "./audio/samplePlayer.js";
 import {attachEventListenersToAudioToggle, resetIsRecording, showIsRecording, showLoader} from "./ui/audioToggle.js";
 import {spectrumSize} from "./config.js";
+import {video} from "./ui/uiHandles.js";
+import {getVideoUrl} from "./ui/loadvideo.js";
 
+video().src = getVideoUrl()
+video().load();
 const effectKeys = Object.keys(allPresets)
 startMainThreadMonitor()
 
@@ -53,7 +59,7 @@ const FIGURE_KEYS = [
   'analysis blocks/0.5s',
   'inter-msg avg ms',
 ]
-for (const key of FIGURE_KEYS) setDiagnostic(key, '—', '#666')
+for (const key of FIGURE_KEYS) setDiagnostic(key, '—', 'rgba(128,128,128,0.7)')
 
 // 5-deep FIFO of recorded-sample rows in the diagnostics panel. Each new
 // recording lands in the next slot (cycling), so all five stay visible
@@ -61,7 +67,7 @@ for (const key of FIGURE_KEYS) setDiagnostic(key, '—', '#666')
 const SAMPLE_SLOTS = 5
 let sampleSlotIndex = 0
 for (let i = 0; i < SAMPLE_SLOTS; i++) {
-  setDiagnostic(`sample ${i}`, '— empty —', '#444')
+  setDiagnostic(`sample ${i}`, '— empty —', 'rgba(128,128,128,0.4)')
 }
 
 function showSampleInSlot(classification, features, color) {
@@ -83,7 +89,21 @@ let audioContext, microphoneStream, effectSwitch, /*drumSamples,*/ recordingChai
 
 async function start() {
   hideLoader = showLoader()
+  try {
+    await startInner()
+    // First successful start swaps the play-button icon from mic → play/pause.
+    // The class stays for the rest of the session; subsequent pauses show
+    // play, not mic, since the mic affordance is no longer informative.
+    document.body.classList.add('audio-started')
+  } catch (e) {
+    console.error('start failed', e)
+    await safeStop()
+    surfaceStartError(e)
+    throw e // let the toggle handler uncheck
+  }
+}
 
+async function startInner() {
   if (audioContext) {
     await audioContext.resume()
     microphoneStream = await getMicrophoneStream(microphoneStream)
@@ -110,6 +130,10 @@ async function start() {
         onRecordStart: showIsRecording,
         onRecordStop: resetIsRecording
       })
+
+    // Now that getUserMedia has succeeded, device labels are readable —
+    // refresh the dropdown so the user sees real device names.
+    populateInputSources()
 
     // setupEffectButtons(audioContext, masterBus.in, masterBus.out)
     // createPresetTuner(effectSwitch, audioContext, masterBus.in, masterBus.out)
@@ -157,6 +181,52 @@ async function start() {
       resetCreep()
     })
   hideLoader()
+  video().play();
+}
+
+// Best-effort cleanup: never throw. Called from start()'s catch path so a
+// half-set-up audio graph gets torn down and the next start() retries from
+// scratch (audioContext goes back to null so the "first time" branch runs).
+async function safeStop() {
+  try { stopLoop() } catch {}
+  try { cancelAllScheduled() } catch {}
+  if (recordingChain?.microphoneInputNode) {
+    try { recordingChain.microphoneInputNode.disconnect() } catch {}
+  }
+  if (microphoneStream) {
+    try { microphoneStream.getAudioTracks().forEach(t => t.stop()) } catch {}
+    microphoneStream = null
+  }
+  try { await pauseAudioContext(audioContext) } catch {}
+  try { await audioContext?.close() } catch {}
+  audioContext = undefined
+  recordingChain = undefined
+  effectSwitch = undefined
+  masterBus = undefined
+  try { clearAllSamples() } catch {}
+  try { clearAllDrums() } catch {}
+  try { clearAllEffects() } catch {}
+  hideLoader?.()
+}
+
+function surfaceStartError(e) {
+  let msg
+  switch (e?.name) {
+    case 'NotAllowedError':
+      msg = 'Microphone access denied. Allow it in your browser settings to enable recording.'
+      break
+    case 'NotFoundError':
+      msg = 'No microphone found. Connect an input device and try again.'
+      break
+    case 'NotReadableError':
+      msg = 'Microphone is in use by another app. Close it and try again.'
+      break
+    default:
+      msg = `Could not start: ${e?.message || e}`
+  }
+  setDiagnostic('start error', msg, '#f55')
+  // Pop the Controls panel open so the user sees the message.
+  document.getElementById('controls')?.setAttribute('open', '')
 }
 
 async function stop() {
@@ -173,7 +243,39 @@ async function stop() {
   clearAllSamples()
   clearAllDrums()
   clearAllEffects()
+  video().pause();
   hideLoader()
 }
 
 attachEventListenersToAudioToggle(start, stop)
+setupInputMeter(audioFeatureSAB)
+
+// Populate the input-source dropdown immediately (labels may be blank pre-permission)
+// and re-populate after the first start() so labels fill in.
+setupInputSourceSelect(async (deviceId) => {
+  setMicDeviceId(deviceId)
+  // Live-swap only makes sense if the audio chain is up.
+  if (!audioContext || !recordingChain) return
+  await swapLiveMicTo(deviceId)
+})
+
+async function swapLiveMicTo(deviceId) {
+  // Tear down the previous stream + audio source node, then bring up a new
+  // one from the chosen device and rewire it into the recording chain.
+  if (microphoneStream) {
+    microphoneStream.getAudioTracks().forEach(t => t.stop())
+    microphoneStream = null
+  }
+  if (recordingChain.microphoneInputNode) {
+    try { recordingChain.microphoneInputNode.disconnect() } catch {}
+  }
+
+  try {
+    microphoneStream = await getMicrophoneStream(null)
+    const newNode = new MediaStreamAudioSourceNode(audioContext, {mediaStream: microphoneStream})
+    newNode.connect(recordingChain.tap)
+    recordingChain.microphoneInputNode = newNode
+  } catch (e) {
+    console.error('failed to swap input device', e)
+  }
+}

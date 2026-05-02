@@ -109,15 +109,17 @@ function initChart(key) {
 
   const label = document.createElement('span')
   label.textContent = key
-  label.style.cssText = `min-width:140px;color:#aaa;`
+  label.style.cssText = `min-width:140px;color:rgba(128,128,128,0.85);`
 
   const canvas = document.createElement('canvas')
   canvas.width = CHART_W
   canvas.height = CHART_H
-  canvas.style.cssText = `width:${CHART_W}px;height:${CHART_H}px;background:rgba(255,255,255,0.04);border-radius:2px;`
+  // 'var()' isn't allowed in inline cssText for rgba, so we read --surface from CSS instead.
+  // rgba(128,128,128,0.08) reads as a faint gray on both light and dark backgrounds.
+  canvas.style.cssText = `width:${CHART_W}px;height:${CHART_H}px;background:rgba(128,128,128,0.08);border-radius:2px;`
 
   const valueEl = document.createElement('span')
-  valueEl.style.cssText = `min-width:60px;text-align:right;color:#ccc;`
+  valueEl.style.cssText = `min-width:60px;text-align:right;color:inherit;`
 
   row.append(label, canvas, valueEl)
   container.appendChild(row)

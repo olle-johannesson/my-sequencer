@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@magenta/music": "^1.23.1",
+    "bowser": "^2.14.1",
     "fftjs": "^0.0.4",
     "meyda": "6.0.0-beta.2"
   }

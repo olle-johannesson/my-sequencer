@@ -48,7 +48,7 @@ export async function continuePattern(seed, temperature = 1.2) {
   })
   const dt = performance.now() - t0
   const color = dt < 30 ? '#7e7' : dt < 100 ? '#ee7' : '#f55'
-  chartDiagnostic('magenta ms', dt, color)
+  chartDiagnostic('ML beat generation ms', dt, color)
   return result
 }
 
