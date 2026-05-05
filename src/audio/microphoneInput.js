@@ -68,3 +68,24 @@ export async function getMicrophoneStream(stream) {
   stream.getAudioTracks().forEach(t => (t.enabled = true));
   return stream
 }
+
+export async function swapLiveMicTo(audioContext, microphoneStream, recordingChain, deviceId) {
+  // Tear down the previous stream + audio source node, then bring up a new
+  // one from the chosen device and rewire it into the recording chain.
+  if (microphoneStream) {
+    microphoneStream.getAudioTracks().forEach(t => t.stop())
+    microphoneStream = null
+  }
+  if (recordingChain.microphoneInputNode) {
+    try { recordingChain.microphoneInputNode.disconnect() } catch {}
+  }
+
+  try {
+    microphoneStream = await getMicrophoneStream(null)
+    const newNode = new MediaStreamAudioSourceNode(audioContext, {mediaStream: microphoneStream})
+    newNode.connect(recordingChain.tap)
+    recordingChain.microphoneInputNode = newNode
+  } catch (e) {
+    console.error('failed to swap input device', e)
+  }
+}

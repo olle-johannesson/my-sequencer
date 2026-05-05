@@ -13,6 +13,7 @@
 // =============================================================================
 
 import {createFeatureMailboxViews} from '../util/mailbox.js'
+import {inputMeter} from './uiHandles.js'
 
 const ATTACK = 1.0     // 1.0 = instant snap to peak (no smoothing on rise)
 const RELEASE = 0.92   // each frame, level *= 0.92 when no new data — ~30 frames to fall to 10%
@@ -26,7 +27,7 @@ let running = false
 
 export function setupInputMeter(audioFeatureSAB) {
   mailbox = createFeatureMailboxViews(audioFeatureSAB)
-  meterEl = document.getElementById('input-meter')
+  meterEl = inputMeter()
   if (!meterEl || running) return
   running = true
   requestAnimationFrame(tick)

@@ -1,5 +1,3 @@
-// chains/grainChain.js
-
 // Convert BPM to milliseconds for note subdivisions
 function bpmToMs(bpm, subdivision) {
   const beatMs = (60 / bpm) * 1000;

@@ -1,8 +1,3 @@
-// =============================================================================
-// Input-source select — populates the <select id="input-source"> with audio-input
-// devices and forwards selection changes to a caller-provided handler.
-// =============================================================================
-//
 // `populateInputSources()` can be called any time. It enumerates audio input
 // devices and replaces the dropdown options. Device labels are blank until the
 // browser has granted mic permission, so call it once on load (so the menu
@@ -16,9 +11,8 @@
 //  - enumerateDevices() on iOS often returns the same physical mic multiple
 //    times (default, communications, the underlying device). We dedupe by
 //    groupId so the menu isn't confusing.
-// =============================================================================
 
-import {inputSourceSelect} from './uiHandles.js'
+import {inputSourceLabel, inputSourceNote, inputSourceSelect} from './uiHandles.js'
 import {isIOS} from '../util/platform.js'
 
 let onDeviceChange  // caller's handler
@@ -41,11 +35,11 @@ export function setupInputSourceSelect(handler) {
 function relabelForIOS() {
   const select = inputSourceSelect()
   if (!select) return
-  const label = document.querySelector('label[for="input-source"]')
+  const label = inputSourceLabel()
   if (label) label.textContent = 'Audio device'
 
   // Append a one-liner under the select explaining the iOS coupling.
-  if (!document.getElementById('input-source-note')) {
+  if (!inputSourceNote()) {
     const note = document.createElement('small')
     note.id = 'input-source-note'
     note.textContent = 'On iOS this also sets the playback device.'

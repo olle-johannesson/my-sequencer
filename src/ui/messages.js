@@ -1,5 +1,4 @@
-const container = document.querySelector('#messages')
-const pre = document.querySelector('#messages .message')
+import {messagesContainer, messagesPre} from './uiHandles.js'
 
 const state = {}
 const charts = {}     // key -> { values, canvas, valueEl, color, max }
@@ -7,8 +6,7 @@ const HISTORY = 120
 const CHART_W = 240
 const CHART_H = 32
 
-// Sparkline alphabet (Sindre Sorhus / classic). Each char encodes one of 8
-// vertical levels — perfect for inline single-line bar charts.
+// Sparkline alphabet
 const SPARK_CHARS = '▁▂▃▄▅▆▇█'
 
 /**
@@ -87,6 +85,7 @@ export function chartDiagnostic(key, value, color) {
 }
 
 function renderText() {
+  const pre = messagesPre()
   if (!pre) return
   const keys = Object.keys(state)
   if (keys.length === 0) { pre.textContent = ''; return }
@@ -103,6 +102,7 @@ function renderText() {
 }
 
 function initChart(key) {
+  const container = messagesContainer()
   if (!container) return
   const row = document.createElement('div')
   row.style.cssText = `display:flex;align-items:center;gap:8px;font-family:monospace;font-size:11px;margin-top:2px;`
