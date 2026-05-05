@@ -1,9 +1,9 @@
 import {thunk} from "./util/thunk.js";
 import {getNormallyDistributedNumber} from "./util/random.js";
-import {clamp} from "./util/clamp.js";
 import {playMonophonicSampleAt, playSampleAt} from "./audio/samplePlayer.js";
 import {repeatState} from "./effects/repeat.js";
 import {incrementPatternAge} from "./patterns/samplePattern.js";
+import {audioConfig} from "./config.js";
 
 export let bpm = 96;
 let isRunning = false
@@ -16,18 +16,12 @@ let swingByStep = new Array(16).fill(0)
 const stepsPerBeat = 4;
 const STEPS_PER_BAR = 16;
 const calculateStepDuration = () => 60 / bpm / stepsPerBeat;
-const scheduleAheadTime = 0.1;
-const baseGain = 0.8;
 const velocityByStep = [
   1.0, 0.5, 0.8, 0.5,
   0.8, 0.4, 0.6, 0.5,
   0.9, 0.5, 0.7, 0.5,
   0.8, 0.4, 0.6, 0.5
 ];
-const commonBpmSettings = [
-  72, 88, 96, 112, 120,
-  132, 144
-]
 
 
 export function setSwing(perStepFractions) {
@@ -86,19 +80,18 @@ function scheduler(audioContext, outputNode, samplePattern, drumPattern, effectP
   // sat where we left it. A naive catch-up would walk through every missed
   // step (and run beforeEachCycle / onEffectChange for each crossed bar
   // boundary, queuing many magenta inferences in a row). If we're more than
-  // MAX_CATCHUP_STEPS behind, snap to "now" and let the loop resync from
+  // maxCatchupSteps behind, snap to "now" and let the loop resync from
   // a fresh bar instead.
   const stepDuration = calculateStepDuration()
-  const MAX_CATCHUP_STEPS = 4
-  if (nextStepTime < audioContext.currentTime - MAX_CATCHUP_STEPS * stepDuration) {
+  if (nextStepTime < audioContext.currentTime - audioConfig.maxCatchupSteps * stepDuration) {
     nextStepTime = audioContext.currentTime + 0.05
     currentStep = 0
     currentBar = 0
   }
 
-  while (nextStepTime < audioContext.currentTime + scheduleAheadTime) {
+  while (nextStepTime < audioContext.currentTime + audioConfig.scheduleAheadTime) {
     // If the beforeEachCycle callback is defined, we call it now (if we are
-    // at the beginning of a new cycle (musical bar), that is...
+    // at the beginning of a new cycle (musical bar), that is).
     if ((currentStep + 1) % STEPS_PER_BAR === 0 && typeof callbacks.beforeEachCycle === 'function') {
       callbacks.beforeEachCycle(currentBar)
     }
@@ -122,7 +115,7 @@ function scheduler(audioContext, outputNode, samplePattern, drumPattern, effectP
       .filter(f => f instanceof AudioBuffer)
       .map(sample => {
         const humanFactor = getNormallyDistributedNumber(0, 0.05);
-        const gain = baseGain * stepVelocity + humanFactor;
+        const gain = audioConfig.baseGain * stepVelocity + humanFactor;
         return t => playMonophonicSampleAt(audioContext, sample, t, gain, outputNode)
       })
 
@@ -133,7 +126,7 @@ function scheduler(audioContext, outputNode, samplePattern, drumPattern, effectP
       .filter(f => f instanceof AudioBuffer)
       .map(sample => {
         const humanFactor = getNormallyDistributedNumber(0, 0.025);
-        const gain = baseGain * stepVelocity + humanFactor;
+        const gain = audioConfig.baseGain * stepVelocity + humanFactor;
         return t => playSampleAt(audioContext, sample, t, gain, outputNode)
       })
 

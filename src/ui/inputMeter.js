@@ -14,9 +14,8 @@
 
 import {createFeatureMailboxViews} from '../util/mailbox.js'
 import {inputMeter} from './uiHandles.js'
+import {meterConfig} from '../config.js'
 
-const ATTACK = 1.0     // 1.0 = instant snap to peak (no smoothing on rise)
-const RELEASE = 0.92   // each frame, level *= 0.92 when no new data — ~30 frames to fall to 10%
 const RMS_INDEX = 1    // featureMailbox.f32[1] holds the latest RMS
 
 let mailbox
@@ -43,15 +42,15 @@ function tick() {
     const rms = mailbox.f32[RMS_INDEX]
     if (rms > displayed) {
       // Fast attack — peak holds.
-      displayed = displayed * (1 - ATTACK) + rms * ATTACK
+      displayed = displayed * (1 - meterConfig.attack) + rms * meterConfig.attack
     } else {
       // Slow release — gracefully fall toward the new (lower) reading.
-      displayed = displayed * RELEASE + rms * (1 - RELEASE)
+      displayed = displayed * meterConfig.release + rms * (1 - meterConfig.release)
     }
   } else {
     // No new analysis data this frame — keep decaying so the meter doesn't
     // sit stuck at the last value when audio stops.
-    displayed *= RELEASE
+    displayed *= meterConfig.release
   }
 
   meterEl.value = displayed

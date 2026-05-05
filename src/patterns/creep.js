@@ -16,18 +16,9 @@
 // =============================================================================
 
 import {chartDiagnostic} from "../ui/messages.js"
+import {creepConfig} from "../config.js"
 
 let bars = 0
-
-const TEMP_BASE = 1.0
-const TEMP_RANGE = 1.0      // adds up to this much on top of base
-const TEMP_HALFBARS = 32    // bars to reach the full range (linear, clamped)
-
-const FX_MAX_CHANCE = 0.5
-const FX_HALFBARS = 64      // bars to reach the cap
-
-const REVERT_MAX_CHANCE = 0.4
-const REVERT_HALFBARS = 66   // start gentle, peak chance once we've drifted far
 
 export function tickCreep() {
   const aggressiveness = 1 + Math.random() * 0.01
@@ -44,22 +35,22 @@ export function creepBars() {
 }
 
 export function creepTemperature() {
-  return TEMP_BASE + TEMP_RANGE * Math.min(1, bars / TEMP_HALFBARS)
+  return creepConfig.tempBase + creepConfig.tempRange * Math.min(1, bars / creepConfig.tempHalfBars)
 }
 
 export function creepEffectChance() {
-  return FX_MAX_CHANCE * Math.min(1, bars / FX_HALFBARS)
+  return creepConfig.fxMaxChance * Math.min(1, bars / creepConfig.fxHalfBars)
 }
 
 // Per-bar probability that we abandon the wandering continuation and snap back
 // to the original seed. Lets the loop "exhale" after a long drift.
 export function creepRevertChance() {
-  return REVERT_MAX_CHANCE * Math.min(1, bars / REVERT_HALFBARS)
+  return creepConfig.revertMaxChance * Math.min(1, bars / creepConfig.revertHalfBars)
 }
 
 // 0..1 normalized creep — for callers that want to bias their behavior smoothly
-// rather than read the raw bar count. Saturates at FX_HALFBARS for consistency
+// rather than read the raw bar count. Saturates at fxHalfBars for consistency
 // with the effect knobs.
 export function creepIntensity() {
-  return Math.min(1, bars / FX_HALFBARS)
+  return Math.min(1, bars / creepConfig.fxHalfBars)
 }

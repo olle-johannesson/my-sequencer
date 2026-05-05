@@ -3,28 +3,23 @@ import {createFeatureMailboxViews, createNoiseSpectrumMailboxViews} from "../uti
 import {rmsFromSpectrum} from "../dsp/rms.js";
 import {createConsecutiveGate} from "../util/consecutiveGate.js";
 import {matchDiscardProfile} from "../dsp/discardProfiles.js";
+import {recordingConfig} from "../config.js";
 
 let previousBlock
 let featureMailbox
 let noiseMailbox
 let spectrumSize
 
-const NOISE_ALPHA = 0.05;
-const NOISE_MARGIN = 3.0;
-const MIN_NOISE_THRESHOLD = 1e-3;
-
-let rmsThreshold = MIN_NOISE_THRESHOLD;
+let rmsThreshold = recordingConfig.minNoiseThreshold;
 let noiseSpectrum = null;
 let noiseRms = 0;
 let recordingState = 0;
 let calibrationFrames = 0;
 
-// hysteresis:
-const START_FACTOR = 0.125;   // how far above noise to start
-const STOP_FACTOR  = 0.12;   // how far above noise to keep going
-const MIN_FRAMES_ABOVE = 1;  // frames above start threshold to trigger
-const MIN_FRAMES_BELOW = 2; // frames below stop threshold to stop
-const hysteresisGate = createConsecutiveGate(MIN_FRAMES_ABOVE, MIN_FRAMES_BELOW);
+const hysteresisGate = createConsecutiveGate(
+  recordingConfig.minFramesAbove,
+  recordingConfig.minFramesBelow,
+);
 
 // User-adjustable scale on the noise-relative thresholds. 1.0 = default;
 // lower values = less sensitive (need more signal above noise to trigger),
@@ -40,18 +35,19 @@ let sensitivityMultiplier = 1.0;
  * @returns {Float32Array} the updated noise spectrum
  */
 function updateNoiseModel(amplitudeSpectrum) {
+  const alpha = recordingConfig.noiseAlpha;
   if (!noiseSpectrum) {
     noiseSpectrum = new Float32Array(amplitudeSpectrum);
   } else {
-    const invA = 1 - NOISE_ALPHA;
+    const invA = 1 - alpha;
     for (let i = 0; i < amplitudeSpectrum.length; i++) {
-      noiseSpectrum[i] = invA * noiseSpectrum[i] + NOISE_ALPHA * amplitudeSpectrum[i];
+      noiseSpectrum[i] = invA * noiseSpectrum[i] + alpha * amplitudeSpectrum[i];
     }
   }
 
   const currentNoiseRms = rmsFromSpectrum(noiseSpectrum);
-  noiseRms = (1 - NOISE_ALPHA) * noiseRms + NOISE_ALPHA * currentNoiseRms;
-  rmsThreshold = Math.max(MIN_NOISE_THRESHOLD, NOISE_MARGIN * noiseRms);
+  noiseRms = (1 - alpha) * noiseRms + alpha * currentNoiseRms;
+  rmsThreshold = Math.max(recordingConfig.minNoiseThreshold, recordingConfig.noiseMargin * noiseRms);
 }
 
 /**
@@ -132,8 +128,8 @@ setInterval(() => {
 function recordingDecision(rms, flux, flatness, centroid) {
   // Higher sensitivity = lower threshold (so quieter input triggers).
   // Multiplier is inverse: 4x more sensitive halves the threshold.
-  const startThreshold = rmsThreshold * START_FACTOR / sensitivityMultiplier;
-  const stopThreshold  = rmsThreshold * STOP_FACTOR  / sensitivityMultiplier;
+  const startThreshold = rmsThreshold * recordingConfig.startFactor / sensitivityMultiplier;
+  const stopThreshold  = rmsThreshold * recordingConfig.stopFactor  / sensitivityMultiplier;
   // Reject if any DISCARD_PROFILE matches the current frame's features.
   // Profiles needing post-classify-only features (lowRatio, decayTime, …)
   // never match here — those undefined values fail every comparison.
