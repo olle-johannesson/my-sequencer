@@ -59,6 +59,23 @@ export function clearAllDrums() {
   for (const slot of scheduledDrums) slot.clear()
 }
 
+/**
+ * Resize the scheduledDrums array in place to match the desired step count.
+ * Used by initDrumPattern when a preset's grid size differs from the current
+ * one (e.g. switching between 1-bar and 2-bar presets). Must mutate the
+ * existing array — looper.js captured the reference at startLoop and a
+ * reassignment wouldn't propagate.
+ */
+function resizeDrumsInPlace(targetSize) {
+  const current = scheduledDrums.length
+  if (current === targetSize) return
+  if (targetSize > current) {
+    for (let i = current; i < targetSize; i++) scheduledDrums.push(new Set())
+  } else {
+    scheduledDrums.length = targetSize
+  }
+}
+
 // When a kit doesn't have a specific drum, fall back to the closest available one
 // so the looper doesn't silently drop the hit. Walk the chain until we land on
 // something the kit actually has.
@@ -96,7 +113,7 @@ async function resolveDrum(audioContext, kit, drumPitch) {
 
 export async function initDrumPattern(audioContext) {
   const preset = funkySeedPresets[Math.floor(Math.random() * funkySeedPresets.length)]
-  console.log('selected beat', preset.name)
+  // console.log('selected beat', preset.name)
 
   // Reset the per-slot sample cache when we (re)bind to a kit — otherwise a
   // previously-loaded sample under a slot would shadow this kit's version.
@@ -108,10 +125,17 @@ export async function initDrumPattern(audioContext) {
 
   seedPattern = await quantizeSeed(preset.seed)
   currentPattern = seedPattern
+
+  // Resize the scheduledDrums array in place to match the preset's grid (so
+  // 2-bar presets get 32 slots, 1-bar gets 16). Mutating in place — not
+  // reassigning — because looper.js captured the reference at startLoop.
+  resizeDrumsInPlace(seedPattern.totalQuantizedSteps)
+
   setSwing(preset.swing)
   setBpm(preset.bpm)
 
   nextPattern = await continuePattern(currentPattern, creepTemperature())
+  // nextPattern = seedPattern // await continuePattern(currentPattern, 0)
   nextOnsets = await toSampleOnsets(audioContext, kit, nextPattern)
   setDrumpattern(nextOnsets)
 }
