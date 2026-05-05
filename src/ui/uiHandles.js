@@ -1,5 +1,31 @@
-export const fxButtons = () => document.getElementById("fx").querySelectorAll("button");
-export const audioToggleLabel = () => document.getElementById('hold');
-export const audioToggle = () => document.getElementById('audio-toggle');
-export const video = () => document.getElementById('bkg-video')
+
+// --- Audio play / pause control --------------------------------------------
+export const audioToggleLabel  = () => document.getElementById('hold');
+export const audioToggle       = () => document.getElementById('audio-toggle');
+
+// --- Background video -------------------------------------------------------
+export const video             = () => document.getElementById('bkg-video');
+
+// --- Controls panel & its inputs -------------------------------------------
+export const controlsPanel     = () => document.getElementById('controls');
 export const inputSourceSelect = () => document.getElementById('input-source');
+export const inputSourceLabel  = () => document.querySelector('label[for="input-source"]');
+export const inputSourceNote   = () => document.getElementById('input-source-note');
+export const inputMeter        = () => document.getElementById('input-meter');
+export const sensitivityGauge  = () => document.getElementById('sensisitivity-gauge');
+export const filterGauge       = () => document.getElementById('filter-gauge');
+
+// --- Monitoring panel -------------------------------------------------------
+export const messagesContainer = () => document.getElementById('messages');
+export const messagesPre       = () => document.querySelector('#messages .message');
+
+// --- Panel container --------------------------------------------------------
+// All <details> in the panels section. Used by the keyboard-shortcut handler
+// to close every open one on Escape, and could be useful for future
+// "expand-all" / "collapse-all" UX.
+export const allPanelDetails   = () => document.querySelectorAll('#panels details');
+
+// --- Legacy / dead --------------------------------------------------------
+// fxButtons used to drive a now-removed effect-tuning UI. Kept exported so
+// any straggler import keeps compiling; safe to delete once confirmed unused.
+export const fxButtons         = () => document.getElementById('fx')?.querySelectorAll('button');
