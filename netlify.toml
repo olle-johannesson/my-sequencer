@@ -1,0 +1,17 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Cross-origin isolation — required for SharedArrayBuffer, which
+# recordingChain.js allocates at module top. Without these headers, the
+# constructor throws synchronously and the entire main.js import chain dies.
+# See vite.config.js's `server.headers` for the same pair (used in dev).
+#
+# COEP=require-corp also means subresources need CORP. We send CORP=same-origin
+# for everything we serve so videos/images/css/js load under the policy.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Embedder-Policy = "require-corp"
+    Cross-Origin-Resource-Policy = "same-origin"
