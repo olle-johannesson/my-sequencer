@@ -1,6 +1,5 @@
 import {chartDiagnostic} from "./ui/messages.js"
 
-const numberOfSteps = 16
 const worker = new Worker(new URL('./workers/magenta.worker.js', import.meta.url), { type: 'module' })
 
 const pending = new Map()
@@ -36,14 +35,16 @@ export async function initMagenta() {
  * @returns {Promise<INoteSequence>}
  */
 export async function continuePattern(seed, temperature = 1.2) {
-  // continueSequence in the worker needs an already-quantized sequence on our 16-step grid.
-  // quantizeSeed runs synchronously here in main; the heavy inference runs in the worker.
+  // continueSequence in the worker needs an already-quantized sequence.
+  // quantizeSeed runs synchronously here in main; the heavy inference runs
+  // in the worker. Step count tracks the seed length so 1-bar presets get
+  // 16 new steps and 2-bar presets get 32.
   const quantized = seed?.totalQuantizedSteps !== undefined ? seed : quantizeSeed(seed)
   const t0 = performance.now()
   const result = await call({
     type: 'continueSequence',
     seed: quantized,
-    numberOfSteps,
+    numberOfSteps: quantized.totalQuantizedSteps,
     temperature,
   })
   const dt = performance.now() - t0
@@ -53,23 +54,25 @@ export async function continuePattern(seed, temperature = 1.2) {
 }
 
 /**
- * Quantize a seed onto the 16th-note grid without running the RNN.
- * Maps startTime/totalTime into one of 16 steps directly — bypasses magenta's
- * tempo-dependent quantization (which would treat startTime as seconds at the
- * default 120 BPM and squash a `totalTime: 1.0` bar into 8 steps).
+ * Quantize a seed onto a 16-steps-per-bar grid without running the RNN.
+ * Grid size scales with totalTime: a 1-bar preset (totalTime: 1.0) → 16 steps,
+ * a 2-bar preset (totalTime: 2.0) → 32 steps. Bypasses magenta's
+ * tempo-dependent quantization, which treats startTime as seconds at the
+ * default 120 BPM and would otherwise squash the bar.
  * @param seed {INoteSequence}
  * @returns {INoteSequence}
  */
 export function quantizeSeed(seed) {
   const total = seed.totalTime || 1
+  const gridSteps = Math.round(total * 16)
   return {
     ...seed,
     notes: seed.notes.map(n => ({
       ...n,
-      quantizedStartStep: Math.round(n.startTime / total * 16) % 16,
-      quantizedEndStep: Math.round(n.endTime / total * 16),
+      quantizedStartStep: Math.round(n.startTime / total * gridSteps) % gridSteps,
+      quantizedEndStep: Math.round(n.endTime / total * gridSteps),
     })),
     quantizationInfo: { stepsPerQuarter: 4 },
-    totalQuantizedSteps: 16,
+    totalQuantizedSteps: gridSteps,
   }
 }
