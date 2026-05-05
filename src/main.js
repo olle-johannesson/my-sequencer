@@ -19,6 +19,7 @@ import {attachEventListenersToAudioToggle, resetIsRecording, showIsRecording, sh
 import {spectrumSize} from "./config.js";
 import {video} from "./ui/uiHandles.js";
 import {getVideoUrl} from "./ui/loadvideo.js";
+import {setVideoEffect} from "./effects/videoEffects.js";
 
 video().src = getVideoUrl()
 video().load();
@@ -177,6 +178,9 @@ async function startInner() {
         } else {
           effectSwitch.deactivate(time)
         }
+        // Mirror the audio change visually. Pass the preset key (string) when
+        // we have one, null otherwise.
+        setVideoEffect(typeof newFx === 'string' ? newFx : null)
       },
     })
 
@@ -215,6 +219,7 @@ async function safeStop() {
   try { clearAllSamples() } catch {}
   try { clearAllDrums() } catch {}
   try { clearAllEffects() } catch {}
+  try { setVideoEffect(null) } catch {}
   hideLoader?.()
 }
 
@@ -252,6 +257,7 @@ async function stop() {
   clearAllSamples()
   clearAllDrums()
   clearAllEffects()
+  setVideoEffect(null)
   video().pause();
   hideLoader()
 }

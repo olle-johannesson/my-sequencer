@@ -12,6 +12,12 @@ let currentBar = 0
 let nextStepTime = undefined
 
 const stepsPerBeat = 4;
+// One musical bar is always 16 steps (4 beats × 4 sixteenths). Drum patterns
+// can span multiple bars (e.g. a 2-bar preset = 32-slot drumPattern); the
+// sample/effect patterns stay 16 and re-loop every musical bar. `currentStep`
+// counts within the longest pattern (drum) and wraps when that one wraps;
+// musical-bar-tick logic uses `% STEPS_PER_BAR`.
+const STEPS_PER_BAR = 16;
 const calculateStepDuration = () => 60 / bpm / stepsPerBeat;
 const scheduleAheadTime = 0.1;
 const baseGain = 0.8;
@@ -75,11 +81,14 @@ function scheduler(audioContext, outputNode, samplePattern, drumPattern, effectP
   }
 
   while (nextStepTime < audioContext.currentTime + scheduleAheadTime) {
-    if (currentStep === samplePattern.length - 1 && typeof callbacks.beforeEachCycle === 'function') {
+    // Fire beforeEachCycle on the *musical-bar* boundary (every 16 steps),
+    // not on the drum-pattern wrap, so creep / sample-rescheduling cadence
+    // is preserved across 1-bar and multi-bar presets.
+    if ((currentStep + 1) % STEPS_PER_BAR === 0 && typeof callbacks.beforeEachCycle === 'function') {
       callbacks.beforeEachCycle(currentBar)
     }
 
-    const stepSamples = samplePattern[currentStep] ?? new Set()
+    const stepSamples = samplePattern[currentStep % samplePattern.length] ?? new Set()
     const drumSamples = drumPattern[currentStep] ?? new Set()
     const stepVelocity = velocityByStep[currentStep % velocityByStep.length] ?? 1;
 
@@ -104,7 +113,7 @@ function scheduler(audioContext, outputNode, samplePattern, drumPattern, effectP
     const swingDelay = swingByStep[currentStep % swingByStep.length] * calculateStepDuration()
     const stepPlayTime = nextStepTime + swingDelay
 
-    const currentEffect = effectPattern?.[currentStep] ?? null
+    const currentEffect = effectPattern?.[currentStep % effectPattern.length] ?? null
     if (currentEffect !== lastEffect && typeof callbacks.onEffectChange === 'function') {
       callbacks.onEffectChange(currentEffect, lastEffect, stepPlayTime)
     }
@@ -122,8 +131,11 @@ function scheduler(audioContext, outputNode, samplePattern, drumPattern, effectP
       }
     }
 
-    currentStep = (currentStep + 1) % samplePattern.length;
-    if (currentStep === 0) {
+    // Wrap on the longest pattern (drumPattern), so multi-bar presets play
+    // through fully before restarting. currentBar / patternAge tick on the
+    // musical-bar cadence (every 16 steps) regardless of drum length.
+    currentStep = (currentStep + 1) % drumPattern.length;
+    if (currentStep % STEPS_PER_BAR === 0) {
       currentBar++
       incrementPatternAge()
     }

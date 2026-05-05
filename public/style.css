@@ -77,7 +77,69 @@ video {
     height: 100%;
     object-fit: cover;
     z-index: 0;
+
+    /* Smooth out abrupt filter/transform changes when an effect engages.
+       Half-second eases means transitions read as gentle drift rather than
+       sudden cuts. */
+    transition: filter .6s ease, transform .6s ease;
 }
+
+/* =============================================================================
+   Video effects — visual counterparts to audio presets. Driven by
+   videoEffects.js (setVideoEffect on each onEffectChange). The class names
+   here mirror the keys in that module's `videoFx` registry.
+
+   Design rules: no fast strobes, no shakes, no aggressive contrast spikes.
+   Everything either holds steady or moves on slow oscillations (≥ 1.2s).
+   ============================================================================= */
+
+/* Bitcrush family — gently crushed colour with a touch of structure */
+video.fx-crunch   { filter: contrast(1.2) saturate(1.25) brightness(0.93); }
+video.fx-lofi     { filter: saturate(0.55) sepia(0.25) contrast(1.05) brightness(0.95); }
+video.fx-meltdown {
+    filter: hue-rotate(15deg) saturate(1.25) blur(1.5px);
+    transform: scale(1.01);
+}
+
+/* Delays — soft blur, gentle vertical drift */
+video.fx-dub      { filter: blur(3px) brightness(1.08) saturate(1.1); }
+video.fx-slapback { filter: brightness(1.06) contrast(1.05); transform: scale(1.005); }
+video.fx-vibrato  { animation: fx-vibrato-y 1.4s ease-in-out infinite; }
+@keyframes fx-vibrato-y {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(2px); }
+}
+
+/* Filter+drive — saturation, slow blur breathing, slow hue+blur drift */
+video.fx-distort  { filter: contrast(1.18) saturate(1.25) hue-rotate(6deg) brightness(1.04); }
+video.fx-lpwobble { animation: fx-lpwobble-blur 2.4s ease-in-out infinite; }
+@keyframes fx-lpwobble-blur {
+    0%, 100% { filter: blur(3.5px) brightness(0.88); }
+    50%      { filter: blur(0.3px) brightness(1.02); }
+}
+video.fx-banddrift { animation: fx-banddrift-hue 6s ease-in-out infinite; }
+@keyframes fx-banddrift-hue {
+    0%, 100% { filter: hue-rotate(-10deg) saturate(1.1) blur(0.5px); }
+    50%      { filter: hue-rotate(10deg)  saturate(1.25) blur(1.5px); }
+}
+
+/* Gates — JS does the playback stutter. CSS adds a soft cue (slight tint +
+   crispness) so it's visually distinct. No flicker. */
+video.fx-stutter  { filter: brightness(1.06) contrast(1.08) saturate(1.05); }
+
+/* Reverse — JS drives the time travel; CSS gives a cool desaturated tint. */
+video.fx-reverse  { filter: hue-rotate(-30deg) saturate(0.7) brightness(0.95); }
+
+/* Pitch — very subtle scale (transition smooths it) */
+video.fx-pitchup   { transform: scale(1.015); }
+video.fx-pitchdown { transform: scale(0.985); }
+
+/* Reverbs — soft glow / blur */
+video.fx-reverb-medium { filter: blur(1.8px) brightness(1.07) saturate(0.92); }
+video.fx-reverb-small  { filter: blur(0.8px) brightness(1.04); }
+
+/* Repeats are wired to playback stutter (tighter loop lengths than gates) —
+   they share the .fx-stutter class for the visual cue. No separate rule. */
 
 #hold {
     margin: auto;

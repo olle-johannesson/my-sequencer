@@ -29,5 +29,8 @@ export const getVideoUrl = () => {
   const isSmallScreen =  window.matchMedia("(max-width: 768px)").matches;
   const slug = isSmallScreen ? 'portrait' : 'landscape'
   const selection = isSmallScreen ? portraitVideos : landscapeVideos
-  return `/images/${slug}/${selection[Math.floor(Math.random() * selection.length)]}.mp4`
+  // import.meta.env.BASE_URL respects vite's `base` config (set to "./" so
+  // assets resolve relative to the document — works under any subpath
+  // deployment, not just at the domain root).
+  return `${import.meta.env.BASE_URL}images/${slug}/${selection[Math.floor(Math.random() * selection.length)]}.mp4`
 }
