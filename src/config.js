@@ -57,9 +57,25 @@ export const recordingConfig = {
   startFactor: 0.125,
   stopFactor: 0.12,
 
-  // Hysteresis frame counts for the consecutive-gate.
+  // Adaptive stop: stop the recording once the level drops below this
+  // fraction of the loudest moment seen *during this take*. Combined with
+  // the static noise-relative stop via max() — so loud takes need to drop
+  // way below their own peak before they end (capturing the full release
+  // tail), while quiet takes still get the tight noise-floor cut.
+  peakStopFraction: 0.05,
+
+  // Hysteresis frame counts for the consecutive-gate. minFramesBelow is the
+  // *default* — sustained takes get extended to sustainedExitFrames once
+  // they've been recognised as such within the first sustainedDetectFrames.
+  // Sustained = tonal source (voice / sustained synth). Detected via
+  // spectral flatness, which is far more reliable than flux for voice
+  // (vibrato / articulation can push flux high even on a held note, but
+  // flatness stays low because the spectrum is sparse).
   minFramesAbove: 1,
   minFramesBelow: 2,
+  sustainedExitFrames: 14,
+  sustainedFlatnessThreshold: 0.15, // avg flatness below this => sustained
+  sustainedDetectFrames: 5,
 
   // Exponential smoothing on the noise model, plus the safety margin
   // applied when computing the rms threshold from the noise.
