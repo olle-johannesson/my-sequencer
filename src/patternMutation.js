@@ -1,34 +1,20 @@
 import {continuePattern} from "./magentaHelper.js";
 import {getNormallyDistributedNumber} from "./util/random.js";
 import {evenlySpacedPartitions} from "./util/evenlySpacedPartitions.js";
-import {DRUM_TO_PITCH, GHOST_PITCHES_BY_CLASS, MAGENTA_DRUM_CLASSES} from "./drums/drumNameMaps.js";
+import {GHOST_PITCHES_BY_CLASS, MAGENTA_DRUM_CLASSES} from "./drums/drumNameMaps.js";
 
 const maxAttemptsToScheduleNewSample = 5
-const maxSamples = 5
-const maxEffects = 3
-let nextSample = 0
-let nextEffect = 0
-
-// DrumsRNN-friendly “filler” pitches
-const goodFillerPitches = [
-  45, // Low Tom
-  48, // Mid Tom
-  50, // High Tom
-  42, // Closed Hat (nice as a “clicky” filler)
-  46, // Open Hat
-  49, // Crash
-  51, // Ride
-];
-
-const pitchesNotCollidingWithTheFillerPitches = [
-  72, 73, 74, 75,
-  76, 77, 78, 79,
-  80, 81, 82, 83,
-  84, 85, 86, 87,
-  88, 89, 90, 91,
-];
 
 /**
+ * Local mirror of the looper's sample-pattern, but with pitch info attached
+ * (the looper's array is just AudioBuffers in Sets — no pitch). We keep this
+ * around so we can build magenta seeds that include the recorded samples
+ * under their assigned ghost pitch — that's how each new recording slots
+ * into the pattern in a magenta-friendly way.
+ *
+ * Cleared by clearMutationState() on stop, so recordings don't leak across
+ * sessions.
+ *
  * @type {*[{ pitch: number, sample: AudioBuffer }][]}
  */
 let samplePattern = [
@@ -37,25 +23,6 @@ let samplePattern = [
   [], [], [], [],
   [], [], [], []
 ]
-
-let effectPattern = [
-  0, 0, 0, 0,
-  0, 0, 0, 0,
-  0, 0, 0, 0,
-  0, 0, 0, 0,
-]
-
-export const aConservativeSeed = {
-  // boom chack boom-boom chack
-  notes: [
-    {pitch: DRUM_TO_PITCH.kick, startTime: 0, endTime: 0.25},
-    {pitch: DRUM_TO_PITCH.snare, startTime: 0.25, endTime: 0.5},
-    {pitch: DRUM_TO_PITCH.kick, startTime: 0.5, endTime: 0.75},
-    {pitch: DRUM_TO_PITCH.kick, startTime: 0.625, endTime: 0.75},
-    {pitch: DRUM_TO_PITCH.snare, startTime: 0.75, endTime: 1.0},
-  ],
-  totalTime: 1.0,
-}
 
 
 /**
@@ -96,30 +63,18 @@ export function rescheduleOneOfTheRecordedSamples(scheduleSample, clearSample) {
   addNewRecordedSample(randomSample, scheduleSample, clearSample)
 }
 
-export async function continueEffectPattern(scheduleEffect, clearAllEffects) {
-  const ghostPitchIndex = ++nextEffect % pitchesNotCollidingWithTheFillerPitches.length
-  const ghostPitch = pitchesNotCollidingWithTheFillerPitches[ghostPitchIndex]
-
-  const oldNotes = effectPattern.map((pitch, i) => pitch ? patternEntryToSeedEntry(pitch) : null).filter(Boolean)
-  const ghostNotesToAdd = evenlySpacedPartitions(2).map(t => patternEntryToSeedEntry(ghostPitch, t))
-  const seed = seedFromSeedEntries(oldNotes, ghostNotesToAdd)
-  const quantizedStartSteps = await getQuantizedStartStepsForPitch(seed, ghostPitch, 0.003)
-  effectPattern = effectPattern.map((pitch, index) => {
-    if (quantizedStartSteps.includes(index)) {
-      return ghostPitch
-    } else if (pitch + maxEffects < ghostPitch) {
-      return 0
-    } else {
-      return pitch
-    }
-  })
-
-  clearAllEffects()
-  effectPattern.forEach((pitch, index) => {
-    if (pitch >= pitchesNotCollidingWithTheFillerPitches[0]) {
-      scheduleEffect(index, pitch - pitchesNotCollidingWithTheFillerPitches[0])
-    }
-  })
+/**
+ * Reset the magenta-seed mirror. Called from stop() — without it, recorded
+ * samples from a previous session persist here and get re-injected into the
+ * next session via rescheduleOneOfTheRecordedSamples.
+ */
+export function clearMutationState() {
+  samplePattern = [
+    [], [], [], [],
+    [], [], [], [],
+    [], [], [], [],
+    [], [], [], []
+  ]
 }
 
 

@@ -27,30 +27,26 @@ const FIGURE_KEYS = [
   'inter-msg avg ms',
 ]
 
+const SAMPLE_SLOTS = 5
+let sampleSlotIndex = 0
+
 export function setupMonitoringPanel() {
   for (const key of FIGURE_KEYS) {
     setDiagnostic(key, '—', 'rgba(128,128,128,0.7)')
   }
+  resetSampleSlots()
+}
 
-  const SAMPLE_SLOTS = 5
-
-  let sampleSlotIndex = 0
-
+/**
+ * Reset the recorded-sample diagnostic rows back to "empty". Called on stop
+ * so the panel doesn't keep displaying samples from a session that's no
+ * longer playing.
+ */
+export function resetSampleSlots() {
+  sampleSlotIndex = 0
   for (let i = 0; i < SAMPLE_SLOTS; i++) {
     setDiagnostic(`sample ${i}`, '— empty —', 'rgba(128,128,128,0.4)')
   }
-}
-
-for (const key of FIGURE_KEYS) {
-  setDiagnostic(key, '—', 'rgba(128,128,128,0.7)')
-}
-
-const SAMPLE_SLOTS = 5
-
-let sampleSlotIndex = 0
-
-for (let i = 0; i < SAMPLE_SLOTS; i++) {
-  setDiagnostic(`sample ${i}`, '— empty —', 'rgba(128,128,128,0.4)')
 }
 
 export function showSampleInSlot(classification, features, color) {

@@ -1,6 +1,6 @@
 import {allPresets, createEffectSwitch} from "./effects/effectSwitch.js";
 import {setupMasterBus} from "./audio/masterChain.js";
-import {addNewRecordedSample, rescheduleOneOfTheRecordedSamples} from "./patternMutation.js";
+import {addNewRecordedSample, clearMutationState, rescheduleOneOfTheRecordedSamples} from "./patternMutation.js";
 import {clearAllSamples, clearSample, samplePattern, samplePatternAge, scheduleSample} from "./patterns/samplePattern.js";
 import {getMicrophoneStream, setMicDeviceId, swapLiveMicTo} from "./audio/microphoneInput.js";
 import {populateInputSources, setupInputSourceSelect} from "./ui/inputSourceSelect.js";
@@ -21,7 +21,7 @@ import {spectrumSize} from "./config.js";
 import {video} from "./ui/uiHandles.js";
 import {getVideoUrl} from "./ui/loadvideo.js";
 import {setVideoEffect} from "./effects/videoEffects.js";
-import {classificationColor, setupMonitoringPanel, showSampleInSlot, surfaceStartError} from "./ui/monitoringPanel.js";
+import {classificationColor, resetSampleSlots, setupMonitoringPanel, showSampleInSlot, surfaceStartError} from "./ui/monitoringPanel.js";
 
 let audioContext, microphoneStream, effectSwitch, /*drumSamples,*/ recordingChain, masterBus, hideLoader
 
@@ -193,6 +193,8 @@ async function safeStop() {
   try { clearAllSamples() } catch {}
   try { clearAllDrums() } catch {}
   try { clearAllEffects() } catch {}
+  try { clearMutationState() } catch {}
+  try { resetSampleSlots() } catch {}
   try { setVideoEffect(null) } catch {}
   hideLoader?.()
 }
@@ -211,6 +213,8 @@ async function stop() {
   clearAllSamples()
   clearAllDrums()
   clearAllEffects()
+  clearMutationState()
+  resetSampleSlots()
   setVideoEffect(null)
   video().pause();
   hideLoader()
