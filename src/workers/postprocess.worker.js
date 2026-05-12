@@ -64,7 +64,7 @@ self.onmessage = (e) => {
         // worklet padded every recording to 2 s; that's no longer the case.)
         if (trimmedView.length < sampleRate / 20) {
           console.log(`recording too short (${trimmedView.length} samples), skipping`)
-          return
+          break
         }
         // de-noise the sample using a wiener filter
         const deNoised = wienerDenoiseBuffer(trimmedView, localNoiseSpectrum, fftSize, hopSize, hannWindow, 8)
@@ -76,7 +76,7 @@ self.onmessage = (e) => {
         const {classification, features, discardedAs} = classify(processed, sampleRate, Meyda)
         if (!classification) {
           console.log(`discarded sample (matched profile: ${discardedAs})`)
-          return
+          break
         }
 
         self.postMessage({samples: processed, sampleRate, classification, features}, [processed.buffer]);
