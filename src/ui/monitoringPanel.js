@@ -55,8 +55,8 @@ export function showSampleInSlot(classification, features, color) {
     {value: features.decayTime,        max: 1},
     {value: features.lowRatio,         max: 1},
     {value: features.highRatio,        max: 1},
-    {value: features.spectralCentroid, max: 10000},
-    {value: features.spectralFlatness, max: 1},
+    {value: features.centroid, max: 10000},
+    {value: features.flatness, max: 1},
   ]
   const slot = sampleSlotIndex % SAMPLE_SLOTS
   sampleSlotIndex++

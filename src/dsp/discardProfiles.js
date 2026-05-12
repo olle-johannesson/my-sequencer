@@ -34,9 +34,13 @@ export const DISCARD_PROFILES = [
   },
   {
     name: 'flat-pad',
-    description: 'Long, no transient, structured but featureless — held tones, drones.',
-    match: ({duration, decayTime}) =>
-      duration > 1.5 && (decayTime / duration) > 0.95,
+    description: 'Long, no transient, no clear pitch — featureless drones (hum, AC, traffic).',
+    // A held *pitched* note has the same envelope shape (duration > 1.5 s,
+    // decay covers most of it) but we want to keep it as a sustained-melodic
+    // source. Gate the discard on pitchStability so only the truly featureless
+    // takes get dropped.
+    match: ({duration, decayTime, pitchStability}) =>
+      duration > 1.5 && (decayTime / duration) > 0.95 && !(pitchStability > 0.5),
   },
 ]
 
