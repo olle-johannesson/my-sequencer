@@ -154,7 +154,15 @@ export async function setupRecordingChain(audioContext, microphoneStream, callBa
     tap,
     recorder,
     analysisReader,
-    startRecordingSamples: (onNewRecordedSample) => postProcessWorker.onmessage = (e) =>
-      onNewRecordedSample(audioBufferFromSAB(audioContext, e.data.samples), e.data.classification, e.data.features)
+    startRecordingSamples: (onNewRecordedSample) => {
+      postProcessWorker.onmessage = (e) => {
+        if (e.data?.type === 'error') {
+          console.error('post-process worker threw', e.data.message, e.data.stack)
+          setDiagnostic('postprocess error', e.data.message, '#f55')
+          return
+        }
+        onNewRecordedSample(audioBufferFromSAB(audioContext, e.data.samples), e.data.classification, e.data.features)
+      }
+    }
   };
 }
