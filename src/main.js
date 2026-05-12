@@ -37,7 +37,7 @@ setupInputSourceSelect(async (deviceId) => {
   setMicDeviceId(deviceId)
   // Live-swap only makes sense if the audio chain is up.
   if (audioContext && recordingChain) {
-    await swapLiveMicTo(audioContext, microphoneStream, recordingChain, deviceId)
+    microphoneStream = await swapLiveMicTo(audioContext, microphoneStream, recordingChain, deviceId)
   }
 })
 
