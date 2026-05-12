@@ -3,7 +3,11 @@ import {getNormallyDistributedNumber} from "./util/random.js";
 import {evenlySpacedPartitions} from "./util/evenlySpacedPartitions.js";
 import {GHOST_PITCHES_BY_CLASS, MAGENTA_DRUM_CLASSES} from "./drums/drumNameMaps.js";
 
-const maxAttemptsToScheduleNewSample = 5
+// Each retry is an awaited magenta round-trip inside `beforeEachCycle`. The
+// looper's catch-up snap masks the audible damage, but a high cap can drop
+// whole bars on slower hardware. 2 attempts is enough that the random
+// fallback rarely triggers in practice.
+const maxAttemptsToScheduleNewSample = 2
 
 /**
  * Local mirror of the looper's sample-pattern, but with pitch info attached
