@@ -2,15 +2,6 @@ import {continuePattern, quantizeSeed} from "../magentaHelper.js";
 import {DRUM_TO_PITCH, PITCH_TO_DRUM} from "../drums/drumNameMaps.js";
 import {setBpm, setSwing} from "../looper.js";
 import {creepRevertChance, creepTemperature, resetCreep, tickCreep} from "./creep.js";
-import {
-  aBoomBapSeed,
-  aDiscoPopSeed,
-  aFunkyDrummerAdjacentSeed,
-  aLeveeAdjacentSeed,
-  aMotorikSeed,
-  anAfrobeatLiteSeed,
-  aRosannaAdjacentSeed
-} from "../drums/beats/index.js";
 import {funkySeedPresets} from "../drums/beats/presets.js";
 import {loadSample} from "../drums/loadSample.js";
 
@@ -23,16 +14,6 @@ let nextOnsets
 let loadedDrumSamples = {}
 
 export {scheduledDrums as drumPattern}
-
-const exampleBeats = [
-  anAfrobeatLiteSeed,
-  aDiscoPopSeed,
-  aBoomBapSeed,
-  aFunkyDrummerAdjacentSeed,
-  aMotorikSeed,
-  aRosannaAdjacentSeed,
-  aLeveeAdjacentSeed
-]
 
 /**
  *
