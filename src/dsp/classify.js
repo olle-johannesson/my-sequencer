@@ -1,5 +1,7 @@
 import {MAGENTA_DRUM_CLASSES} from "../drums/drumNameMaps.js";
 import {matchDiscardProfile} from "./discardProfiles.js";
+import {detectPitch} from "./pitch.js";
+import {sustainedScore} from "./sustained.js";
 
 const ATTACK_BLOCK = 2048   // power of 2; ~46 ms at 44.1 kHz — first slice for spectral features
 
@@ -15,9 +17,15 @@ export function classify(samples, sampleRate, Meyda) {
   const lowRatio  = bandEnergyRatio(amplitudeSpectrum, sampleRate, 0,    200)        // sub-200 Hz share
   const highRatio = bandEnergyRatio(amplitudeSpectrum, sampleRate, 5000, sampleRate / 2) // 5 kHz–nyquist share
 
+  // Multi-window features. Computed once per recording so the cost is small
+  // and only paid on samples that survived the recording gate.
+  const sustained = sustainedScore(samples, sampleRate)
+  const {pitchHz, pitchStability} = detectPitch(samples, sampleRate)
+
   const features = {
     duration, decayTime, lowRatio, highRatio,
     centroid: spectralCentroid, flatness: spectralFlatness,
+    sustained, pitchHz, pitchStability,
   }
 
   // Second-line defense — anything that matches a discard profile here either
