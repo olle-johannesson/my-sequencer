@@ -59,23 +59,6 @@ export function clearAllDrums() {
   for (const slot of scheduledDrums) slot.clear()
 }
 
-/**
- * Resize the scheduledDrums array in place to match the desired step count.
- * Used by initDrumPattern when a preset's grid size differs from the current
- * one (e.g. switching between 1-bar and 2-bar presets). Must mutate the
- * existing array — looper.js captured the reference at startLoop and a
- * reassignment wouldn't propagate.
- */
-function resizeDrumsInPlace(targetSize) {
-  const current = scheduledDrums.length
-  if (current === targetSize) return
-  if (targetSize > current) {
-    for (let i = current; i < targetSize; i++) scheduledDrums.push(new Set())
-  } else {
-    scheduledDrums.length = targetSize
-  }
-}
-
 // When a kit doesn't have a specific drum, fall back to the closest available one
 // so the looper doesn't silently drop the hit. Walk the chain until we land on
 // something the kit actually has.
@@ -125,11 +108,6 @@ export async function initDrumPattern(audioContext) {
 
   seedPattern = await quantizeSeed(preset.seed)
   currentPattern = seedPattern
-
-  // Resize the scheduledDrums array in place to match the preset's grid (so
-  // 2-bar presets get 32 slots, 1-bar gets 16). Mutating in place — not
-  // reassigning — because looper.js captured the reference at startLoop.
-  resizeDrumsInPlace(seedPattern.totalQuantizedSteps)
 
   setSwing(preset.swing)
   setBpm(preset.bpm)

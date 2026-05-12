@@ -99,13 +99,13 @@ function scheduler(audioContext, outputNode, samplePattern, drumPattern, effectP
     // Now we can get to work scheduling samples!
     // First, we look into the sample patterns we have established to see what samples should be
     // scheduled for this 16th, as well as which effect we have scheduled.
-    const stepSamples = samplePattern[currentStep % samplePattern.length] ?? new Set()
+    const stepSamples = samplePattern[currentStep] ?? new Set()
     const drumSamples = drumPattern[currentStep] ?? new Set()
-    const currentEffect = effectPattern?.[currentStep % effectPattern.length] ?? null
+    const currentEffect = effectPattern?.[currentStep] ?? null
 
     // The base volume and swing factor for this 16th can be established at this point
-    const stepVelocity = velocityByStep[currentStep % velocityByStep.length] ?? 1;
-    const swingFactor = swingByStep[currentStep % swingByStep.length]
+    const stepVelocity = velocityByStep[currentStep];
+    const swingFactor = swingByStep[currentStep]
 
     // We map the samples to functions that will schedule them at time t. This gives us an opportunity
     // to call thunks, weed out potential null returns or other cruft, and further refine the volume
@@ -163,11 +163,8 @@ function scheduler(audioContext, outputNode, samplePattern, drumPattern, effectP
       }
     }
 
-    // Wrap on the longest pattern (drumPattern), so multi-bar presets play
-    // through fully before restarting. currentBar / patternAge tick on the
-    // musical-bar cadence (every 16 steps) regardless of drum length.
-    currentStep = (currentStep + 1) % drumPattern.length;
-    if (currentStep % STEPS_PER_BAR === 0) {
+    currentStep = (currentStep + 1) % STEPS_PER_BAR;
+    if (currentStep === 0) {
       currentBar++
       incrementPatternAge()
     }

@@ -37,8 +37,7 @@ export async function initMagenta() {
 export async function continuePattern(seed, temperature = 1.2) {
   // continueSequence in the worker needs an already-quantized sequence.
   // quantizeSeed runs synchronously here in main; the heavy inference runs
-  // in the worker. Step count tracks the seed length so 1-bar presets get
-  // 16 new steps and 2-bar presets get 32.
+  // in the worker.
   const quantized = seed?.totalQuantizedSteps !== undefined ? seed : quantizeSeed(seed)
   const t0 = performance.now()
   const result = await call({
@@ -55,24 +54,20 @@ export async function continuePattern(seed, temperature = 1.2) {
 
 /**
  * Quantize a seed onto a 16-steps-per-bar grid without running the RNN.
- * Grid size scales with totalTime: a 1-bar preset (totalTime: 1.0) → 16 steps,
- * a 2-bar preset (totalTime: 2.0) → 32 steps. Bypasses magenta's
- * tempo-dependent quantization, which treats startTime as seconds at the
- * default 120 BPM and would otherwise squash the bar.
+ * Bypasses magenta's tempo-dependent quantization, which treats startTime as
+ * seconds at the default 120 BPM and would otherwise squash the bar.
  * @param seed {INoteSequence}
  * @returns {INoteSequence}
  */
 export function quantizeSeed(seed) {
-  const total = seed.totalTime || 1
-  const gridSteps = Math.round(total * 16)
   return {
     ...seed,
     notes: seed.notes.map(n => ({
       ...n,
-      quantizedStartStep: Math.round(n.startTime / total * gridSteps) % gridSteps,
-      quantizedEndStep: Math.round(n.endTime / total * gridSteps),
+      quantizedStartStep: Math.round(n.startTime * 16) % 16,
+      quantizedEndStep: Math.round(n.endTime * 16),
     })),
     quantizationInfo: { stepsPerQuarter: 4 },
-    totalQuantizedSteps: gridSteps,
+    totalQuantizedSteps: 16,
   }
 }
