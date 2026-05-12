@@ -36,22 +36,6 @@ export async function createMicrophoneStream() {
   return navigator.mediaDevices.getUserMedia({ audio: baseAudioConstraints })
 }
 
-export function pauseMic(stream, node) {
-  if (node) {
-    try { node.disconnect(); } catch {}
-    node = null
-  }
-  if (stream) {
-    stream.getAudioTracks().forEach(t => (t.enabled = false));
-    stream = null
-  }
-
-  return null
-  // stream.getAudioTracks().forEach(t => (t.enabled = false));
-
-  return stream
-}
-
 export async function getMicrophoneStream(stream) {
   // If we already have a stream but its device differs from currentDeviceId,
   // tear it down so the next call picks the user's selection.
