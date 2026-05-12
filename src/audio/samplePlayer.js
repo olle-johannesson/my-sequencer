@@ -22,12 +22,16 @@ export function cancelAllScheduled() {
  * a second time before the last time has played to the end, the second one will interrupt the first one.
  *
  * @param audioContext {AudioContext}
- * @param sample {AudioBufferSourceNode}
+ * @param sample {AudioBuffer}
  * @param time {number}
- * @param gain {GainNode}
+ * @param gain {number}
  * @param outputNode {AudioNode}
+ * @param modulation {{offset?: number, duration?: number, playbackRate?: number}=}
+ *   Per-trigger overrides for chopping / pitch-shifting (e.g. sustained pitched
+ *   samples played at pentatonic offsets). Omitted → plays the whole sample at
+ *   its natural rate from sample-time 0, same as before.
  */
-export function playMonophonicSampleAt(audioContext, sample, time, gain = 1, outputNode) {
+export function playMonophonicSampleAt(audioContext, sample, time, gain = 1, outputNode, modulation) {
   if (!sample) return;
 
   // Only stop currently playing if we're scheduling for immediate playback
@@ -43,8 +47,11 @@ export function playMonophonicSampleAt(audioContext, sample, time, gain = 1, out
     currentlyPlaying.delete(sample)
   }
 
-  let bufferSource = audioContext.createBufferSource()
+  const bufferSource = audioContext.createBufferSource()
   bufferSource.buffer = sample;
+  if (modulation?.playbackRate !== undefined) {
+    bufferSource.playbackRate.value = modulation.playbackRate
+  }
 
   const gainNode = audioContext.createGain();
   gainNode.gain.value = gain;
@@ -52,7 +59,12 @@ export function playMonophonicSampleAt(audioContext, sample, time, gain = 1, out
   bufferSource.connect(gainNode);
   gainNode.connect(outputNode);
 
-  bufferSource.start(time);
+  const offset = modulation?.offset ?? 0
+  if (modulation?.duration !== undefined) {
+    bufferSource.start(time, offset, modulation.duration)
+  } else {
+    bufferSource.start(time, offset)
+  }
   track(bufferSource)
 
   // Only track as "currently playing" if it's immediate
@@ -65,16 +77,20 @@ export function playMonophonicSampleAt(audioContext, sample, time, gain = 1, out
  * Schedule a sample to be played at an exact time.
  *
  * @param audioContext {AudioContext}
- * @param sample {AudioBufferSourceNode}
+ * @param sample {AudioBuffer}
  * @param time {number}
- * @param gain {GainNode}
+ * @param gain {number}
  * @param outputNode {AudioNode}
+ * @param modulation {{offset?: number, duration?: number, playbackRate?: number}=}
  */
-export function playSampleAt(audioContext, sample, time, gain = 1, outputNode) {
+export function playSampleAt(audioContext, sample, time, gain = 1, outputNode, modulation) {
   if (!sample) return;
 
-  let bufferSource = audioContext.createBufferSource()
+  const bufferSource = audioContext.createBufferSource()
   bufferSource.buffer = sample;
+  if (modulation?.playbackRate !== undefined) {
+    bufferSource.playbackRate.value = modulation.playbackRate
+  }
 
   const gainNode = audioContext.createGain();
   gainNode.gain.value = gain;
@@ -82,7 +98,12 @@ export function playSampleAt(audioContext, sample, time, gain = 1, outputNode) {
   bufferSource.connect(gainNode);
   gainNode.connect(outputNode);
 
-  bufferSource.start(time);
+  const offset = modulation?.offset ?? 0
+  if (modulation?.duration !== undefined) {
+    bufferSource.start(time, offset, modulation.duration)
+  } else {
+    bufferSource.start(time, offset)
+  }
   track(bufferSource)
 }
 
