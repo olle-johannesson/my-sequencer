@@ -16,6 +16,17 @@ let loadedDrumSamples = {}
 export {scheduledDrums as drumPattern}
 
 /**
+ * The magenta-quantized note sequence currently driving the drums. Exposed
+ * so the bass pattern can seed its own continuation from it (ghosting in
+ * extra kicks, then extracting bass onsets from the result). Lifetime-wise
+ * it's whatever updateDrumPattern most recently promoted; nullable until
+ * initDrumPattern has run.
+ */
+export function getCurrentPattern() {
+  return currentPattern
+}
+
+/**
  *
  * @param pattern {{drum: AudioBuffer, onset: number}[]}
  */
