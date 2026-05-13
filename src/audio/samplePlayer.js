@@ -1,9 +1,15 @@
-const currentlyPlaying = new Map()
+// Per-AudioBuffer: the most recently scheduled monophonic source. Used so
+// each new scheduled play of the same buffer fades out its predecessor
+// ending exactly at the new start time — universal monophonic across both
+// immediate retriggers and look-ahead-scheduled hits.
+const lastMonophonic = new Map()
+
+// Every scheduled source (mono + poly) so cancelAllScheduled can rip them all.
 const pendingSources = new Set()
 
 function track(bufferSource) {
   pendingSources.add(bufferSource)
-  bufferSource.onended = () => pendingSources.delete(bufferSource)
+  bufferSource.addEventListener('ended', () => pendingSources.delete(bufferSource))
 }
 
 export function cancelAllScheduled() {
@@ -12,14 +18,31 @@ export function cancelAllScheduled() {
     try { src.disconnect() } catch {}
   }
   pendingSources.clear()
-  currentlyPlaying.clear()
+  lastMonophonic.clear()
+}
+
+// "Lil crossfade" — fade applied to the previous monophonic source when a
+// new one replaces it. 20 ms kills clicks at rate boundaries while keeping
+// the new note's attack intact (no fade-in on the new source).
+const FADE_MS = 20
+
+function scheduleFadeOut(audioContext, bufferSource, gainNode, endTime) {
+  const fadeSec = FADE_MS / 1000
+  const fadeStart = Math.max(audioContext.currentTime, endTime - fadeSec)
+  try {
+    gainNode.gain.cancelScheduledValues(fadeStart)
+    gainNode.gain.setValueAtTime(gainNode.gain.value, fadeStart)
+    gainNode.gain.linearRampToValueAtTime(0.0001, endTime)
+    bufferSource.stop(endTime + 0.001)
+  } catch {}
 }
 
 /**
  * Schedule a sample to be played at an exact time.
  *
- * It is set up to imitate a single channel per sample, so that if the same sample is scheduled to play
- * a second time before the last time has played to the end, the second one will interrupt the first one.
+ * Universal monophonic: any previously-scheduled play of this same buffer
+ * — whether already in progress or still queued for the future — is faded
+ * out ending exactly at `time`. New playback starts at full gain at `time`.
  *
  * @param audioContext {AudioContext}
  * @param sample {AudioBuffer}
@@ -29,22 +52,14 @@ export function cancelAllScheduled() {
  * @param modulation {{offset?: number, duration?: number, playbackRate?: number}=}
  *   Per-trigger overrides for chopping / pitch-shifting (e.g. sustained pitched
  *   samples played at pentatonic offsets). Omitted → plays the whole sample at
- *   its natural rate from sample-time 0, same as before.
+ *   its natural rate from sample-time 0.
  */
 export function playMonophonicSampleAt(audioContext, sample, time, gain = 1, outputNode, modulation) {
   if (!sample) return;
 
-  // Only stop currently playing if we're scheduling for immediate playback
-  // (within 50ms). For future scheduling (repeats), allow polyphonic playback.
-  const now = audioContext.currentTime;
-  const isImmediate = (time - now) < 0.05;
-
-  if (isImmediate && currentlyPlaying.has(sample)) {
-    try {
-      const { bufferSource, gainNode } = currentlyPlaying.get(sample)
-      stopWithFade(audioContext, bufferSource, gainNode)
-    } catch {}
-    currentlyPlaying.delete(sample)
+  const prev = lastMonophonic.get(sample)
+  if (prev && prev.startTime < time) {
+    scheduleFadeOut(audioContext, prev.bufferSource, prev.gainNode, time)
   }
 
   const bufferSource = audioContext.createBufferSource()
@@ -67,14 +82,21 @@ export function playMonophonicSampleAt(audioContext, sample, time, gain = 1, out
   }
   track(bufferSource)
 
-  // Only track as "currently playing" if it's immediate
-  if (isImmediate) {
-    currentlyPlaying.set(sample, { bufferSource, gainNode })
-  }
+  // Remember as the active source so the next call can fade it out cleanly.
+  // Clear the entry when it ends naturally so we don't try to fade a
+  // stopped node on the following play.
+  const record = { bufferSource, gainNode, startTime: time }
+  lastMonophonic.set(sample, record)
+  bufferSource.addEventListener('ended', () => {
+    if (lastMonophonic.get(sample) === record) {
+      lastMonophonic.delete(sample)
+    }
+  })
 }
 
 /**
- * Schedule a sample to be played at an exact time.
+ * Schedule a sample to be played at an exact time. Polyphonic — used for
+ * drums where multiple hits can stack on the same step (kick + snare + hat).
  *
  * @param audioContext {AudioContext}
  * @param sample {AudioBuffer}
@@ -105,15 +127,4 @@ export function playSampleAt(audioContext, sample, time, gain = 1, outputNode, m
     bufferSource.start(time, offset)
   }
   track(bufferSource)
-}
-
-function stopWithFade(audioContext, bufferSource, gainNode, fadeMs = 5) {
-  const now = audioContext.currentTime;
-  const fade = fadeMs / 1000;
-
-  gainNode.gain.cancelScheduledValues(now);
-  gainNode.gain.setValueAtTime(gainNode.gain.value, now);
-  gainNode.gain.linearRampToValueAtTime(0.0001, now + fade);
-
-  bufferSource.stop(now + fade + 0.001);
 }
