@@ -8,5 +8,5 @@ export const bassSamples = [
   // () => import('./samples/bass/BASSELEC.WAV?url'),
   // () => import('./samples/bass/BASSFNK1.WAV?url'),
   // () => import('./samples/bass/BASSFNK2.WAV?url'),
-  () => import('./samples/bass/SYN K 2.wav?url'),
+  () => import('./samples/bass/SYN K 2_faded.wav?url'),
 ]
