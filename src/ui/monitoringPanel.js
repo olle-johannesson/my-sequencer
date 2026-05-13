@@ -51,16 +51,23 @@ export function resetSampleSlots() {
 
 export function showSampleInSlot(classification, features, color) {
   const items = [
-    {value: features.duration,         max: 2},
-    {value: features.decayTime,        max: 1},
-    {value: features.lowRatio,         max: 1},
-    {value: features.highRatio,        max: 1},
-    {value: features.centroid, max: 10000},
-    {value: features.flatness, max: 1},
+    {value: features.duration,            max: 2},
+    {value: features.decayTime,           max: 1},
+    {value: features.lowRatio,            max: 1},
+    {value: features.highRatio,           max: 1},
+    {value: features.centroid,            max: 10000},
+    {value: features.flatness,            max: 1},
+    {value: features.sustained ?? 0,      max: 1},
+    {value: features.pitchHz ?? 0,        max: 4000},
+    {value: features.pitchStability ?? 0, max: 1},
   ]
   const slot = sampleSlotIndex % SAMPLE_SLOTS
   sampleSlotIndex++
-  setDiagnostic(`sample ${slot}`, `${classification.padEnd(13)} ${sparkline(items)}`, color)
+  // Trailing numbers spell out pitchHz + pitchStability — sparkline is too
+  // coarse for the gates we care about (e.g. 0.6 threshold for modulation).
+  const pHz = features.pitchHz ? `${Math.round(features.pitchHz)}Hz` : '—'
+  const pS  = features.pitchStability != null ? features.pitchStability.toFixed(2) : '—'
+  setDiagnostic(`sample ${slot}`, `${classification.padEnd(13)} ${sparkline(items)}  ${pHz} s=${pS}`, color)
 }
 
 export function surfaceStartError(e) {

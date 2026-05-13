@@ -17,24 +17,33 @@ const SEMITONES_PER_OCTAVE = 12
  * scale tones are equal-temperament ratios: `2^(semitones / 12)`. The
  * detected fundamental in Hz is *not* needed; the rates are purely relative.
  *
- * Returned rates are deduplicated and sorted ascending, so the unison sits
- * somewhere in the middle of the array. Caller indexes however suits the
- * musical intent — random, cycling, weighted, etc.
+ * Range is specified in semitones (not octaves) so callers can land
+ * anywhere between "one octave" (±6) and "one and a half" (±9) without
+ * having to re-do the math.
+ *
+ * Returned rates are deduplicated and sorted ascending, so the unison
+ * sits somewhere in the middle of the array. Caller indexes however
+ * suits the musical intent — random, cycling, weighted, etc.
  *
  * @param {object} [opts]
- * @param {number} [opts.octavesDown=1]
- * @param {number} [opts.octavesUp=1]
+ * @param {number} [opts.semitonesDown=7] — how many semitones below root to include
+ * @param {number} [opts.semitonesUp=7]   — how many semitones above root to include
  * @param {number[]} [opts.intervals=MINOR_PENTATONIC] — semitone offsets within an octave
  * @returns {number[]}
  */
 export function pentatonicRates({
-  octavesDown = 1,
-  octavesUp = 1,
+  semitonesDown = 7,
+  semitonesUp = 7,
   intervals = MINOR_PENTATONIC,
 } = {}) {
+  // Scan enough octaves either side to cover the requested range.
+  const octaveSpan = Math.floor(Math.max(semitonesDown, semitonesUp) / SEMITONES_PER_OCTAVE) + 1
   const semitones = new Set()
-  for (let oct = -octavesDown; oct <= octavesUp; oct++) {
-    for (const i of intervals) semitones.add(oct * SEMITONES_PER_OCTAVE + i)
+  for (let oct = -octaveSpan; oct <= octaveSpan; oct++) {
+    for (const i of intervals) {
+      const st = oct * SEMITONES_PER_OCTAVE + i
+      if (st >= -semitonesDown && st <= semitonesUp) semitones.add(st)
+    }
   }
   return [...semitones]
     .sort((a, b) => a - b)

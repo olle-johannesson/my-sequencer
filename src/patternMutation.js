@@ -2,6 +2,13 @@ import {continuePattern} from "./magentaHelper.js";
 import {getNormallyDistributedNumber} from "./util/random.js";
 import {evenlySpacedPartitions} from "./util/evenlySpacedPartitions.js";
 import {GHOST_PITCHES_BY_CLASS, MAGENTA_DRUM_CLASSES} from "./drums/drumNameMaps.js";
+import {buildModulationTable, setModulation} from "./patterns/modulation.js";
+
+// Pitch-stability score above which a recorded sample is treated as a
+// sustained pitched source — gets equipped with a pentatonic modulation
+// table that the looper walks across the bar. 0.6 is the initial guess;
+// re-tune against real recordings.
+const PITCHED_STABILITY_THRESHOLD = 0.1
 
 // Each retry is an awaited magenta round-trip inside `beforeEachCycle`. The
 // looper's catch-up snap masks the audible damage, but a high cap can drop
@@ -47,7 +54,27 @@ let samplePattern = [
  * @param clearSample {(sample: AudioBuffer) => void}
  * @param classification {string}
  */
-export async function addNewRecordedSample(sample, scheduleSample, clearSample, classification = MAGENTA_DRUM_CLASSES.percussive) {
+export async function addNewRecordedSample(sample, scheduleSample, clearSample, classification = MAGENTA_DRUM_CLASSES.percussive, features) {
+  // Equip stable-pitched samples with a modulation table before they hit
+  // the looper. WeakMap-keyed by buffer, so every scheduled occurrence of
+  // this sample walks the same melodic cursor.
+  if (features?.pitchStability > PITCHED_STABILITY_THRESHOLD) {
+    const table = buildModulationTable(sample)
+    setModulation(sample, table)
+    console.log('modulation set', {
+      pitchHz: features.pitchHz,
+      pitchStability: features.pitchStability,
+      bufferDuration: sample.duration,
+      sliceMs: Math.round((sample.duration / table.entries.length) * 1000),
+      rates: table.entries.map(e => e.playbackRate.toFixed(3)),
+    })
+  } else {
+    console.log('no modulation', {
+      pitchHz: features?.pitchHz,
+      pitchStability: features?.pitchStability,
+    })
+  }
+
   const suitableGhostPitches = GHOST_PITCHES_BY_CLASS[classification]
   const ghostPitch = suitableGhostPitches[Math.floor(Math.random() * suitableGhostPitches.length)]
 

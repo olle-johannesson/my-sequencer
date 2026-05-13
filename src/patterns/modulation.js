@@ -7,6 +7,20 @@ import {pentatonicRates} from '../dsp/pentatonic.js'
 // a feel knob, not user-facing.
 const WALK_STDDEV = 1.0
 
+// Target wall-clock duration for one chop, in seconds. ~200 ms is roughly
+// a 16th-note at the current BPM range — short enough to feel rhythmic,
+// long enough to actually be heard as a note rather than a click. The
+// actual slice length is buffer-clamped: a 1-second buffer cuts into 5
+// slices, a 100 ms buffer becomes a single "whole-buffer per entry" slice.
+const TARGET_SLICE_SEC = 0.2
+
+// Pentatonic range, in semitones each side of the recorded root. ±7 ≈ a
+// perfect fifth either direction, ~14 semitones of span total. Pure-octave
+// jumps are out of reach (12 isn't a minor-pentatonic interval at this
+// width); the walker stays in a tight melodic register.
+const SCALE_SEMITONES_DOWN = 7
+const SCALE_SEMITONES_UP   = 7
+
 // Per-buffer walker state. Keyed by AudioBuffer so the *same sample*
 // placed at multiple pattern steps shares one cursor — successive hits
 // walk a single line through the scale instead of each step picking
@@ -25,10 +39,20 @@ const stateByBuffer = new WeakMap()
  * @returns {{entries: {offset: number, duration: number, playbackRate: number}[], cursor: number}}
  */
 export function buildModulationTable(buffer) {
-  const rates = pentatonicRates({octavesDown: 1, octavesUp: 1})
-  const sliceLength = buffer.duration / rates.length
+  const rates = pentatonicRates({
+    semitonesDown: SCALE_SEMITONES_DOWN,
+    semitonesUp: SCALE_SEMITONES_UP,
+  })
+
+  // Number of chops falls out of the buffer length, not the rate count.
+  // Long buffer → many chops; short buffer → 1 chop (every entry plays
+  // the whole buffer, only the playbackRate varies). Rates and chops are
+  // decoupled — entries cycle through the available chops.
+  const numChops = Math.max(1, Math.floor(buffer.duration / TARGET_SLICE_SEC))
+  const sliceLength = buffer.duration / numChops
+
   const entries = rates.map((playbackRate, i) => ({
-    offset: i * sliceLength,
+    offset: (i % numChops) * sliceLength,
     duration: sliceLength,
     playbackRate,
   }))

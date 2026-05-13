@@ -60,17 +60,28 @@ export function detectPitch(samples, sampleRate) {
     return { pitchHz: null, pitchStability: 0 }
   }
 
-  const sorted = [...pitches].sort((a, b) => a - b)
-  const median = sorted[sorted.length >> 1]
+  // Work in log-2 frequency space so octave-folding is a single integer
+  // shift. YIN tends to halve or double pitch on near-pure tones (whistles,
+  // sine-like leads); without folding, one octave-error window torpedoes
+  // the deviation score for an otherwise-stable take.
+  const logPitches = pitches.map(p => Math.log2(p))
+  const sortedLogs = [...logPitches].sort((a, b) => a - b)
+  const logRoughMedian = sortedLogs[sortedLogs.length >> 1]
 
-  // Mean cents deviation from the median, mapped to a 0..1 tightness score.
+  // Snap each detection to whichever octave of the rough median it's nearest.
+  // Real pitch jitter stays measurable; octave errors collapse to zero.
+  const folded = logPitches.map(lp => lp + Math.round(logRoughMedian - lp))
+
+  const sortedFolded = [...folded].sort((a, b) => a - b)
+  const logMedian = sortedFolded[sortedFolded.length >> 1]
+
   let meanCentsDev = 0
-  for (const p of pitches) meanCentsDev += Math.abs(1200 * Math.log2(p / median))
-  meanCentsDev /= pitches.length
+  for (const lp of folded) meanCentsDev += Math.abs(1200 * (lp - logMedian))
+  meanCentsDev /= folded.length
   const tightness = Math.max(0, 1 - meanCentsDev / CENTS_FLOOR)
 
   // Penalise samples where only a fraction of windows resolved at all.
   const detectionRate = pitches.length / STABILITY_WINDOWS
 
-  return { pitchHz: median, pitchStability: tightness * detectionRate }
+  return { pitchHz: Math.pow(2, logMedian), pitchStability: tightness * detectionRate }
 }
