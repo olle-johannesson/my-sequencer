@@ -27,6 +27,10 @@ import {setVideoEffect} from "./effects/videoEffects.js";
 import {classificationColor, resetSampleSlots, setupMonitoringPanel, showSampleInSlot, surfaceStartError} from "./ui/monitoringPanel.js";
 
 let audioContext, microphoneStream, effectSwitch, recordingChain, masterBus, hideLoader
+// Set by softStop, cleared by start() after one resume — keeps the next
+// start from re-initialising drum / bass / sample patterns so the user
+// picks up exactly where they left off.
+let wasSoftStopped = false
 
 video().src = getVideoUrl()
 video().load();
@@ -100,12 +104,16 @@ async function start() {
 
     // 2. Initial patterns. Drum init + bass-sample load can run in parallel;
     // the bass *pattern* itself seeds from the drum continuation, so it
-    // has to wait for both.
-    await Promise.all([
-      initDrumPattern(audioContext),
-      initBassPattern(audioContext),
-    ])
-    await updateBassPattern(getCurrentPattern())
+    // has to wait for both. Skipped on resume from softStop — the existing
+    // patterns are still in memory and we want to land right back on them.
+    if (!wasSoftStopped) {
+      await Promise.all([
+        initDrumPattern(audioContext),
+        initBassPattern(audioContext),
+      ])
+      await updateBassPattern(getCurrentPattern())
+    }
+    wasSoftStopped = false
 
     // 3. Start the loop.
     startLoop(
@@ -199,4 +207,27 @@ async function stop() {
   setVideoEffect(null)
   video().pause();
   hideLoader()
+}
+
+/**
+ * Pause the way an external interruption should pause — the user's pattern
+ * state stays in memory so the next start picks up exactly where we left
+ * off. Used when the selected output device disappears, etc. The mic and
+ * loop go down (so the browser drops its mic indicator and the scheduler
+ * idles), but `audioContext` stays alive for a fast resume.
+ */
+async function softStop() {
+  wasSoftStopped = true
+  stopLoop()
+  cancelAllScheduled()
+  if (recordingChain?.microphoneInputNode) {
+    try { recordingChain.microphoneInputNode.disconnect() } catch {}
+  }
+  if (microphoneStream) {
+    microphoneStream.getAudioTracks().forEach(t => t.stop())
+    microphoneStream = null
+  }
+  await pauseAudioContext(audioContext)
+  setVideoEffect(null)
+  video().pause()
 }
