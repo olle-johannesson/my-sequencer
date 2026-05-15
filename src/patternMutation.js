@@ -137,7 +137,7 @@ const clearPitchFromPattern = (pitch, pattern, callBackWithSampleWhenPitchIsFoun
  * @return {INoteSequence}
  */
 const makeSeedWithGhostPitchFromPattern = (ghostPitch, pattern, timesToAddGhostPitch = 2) => {
-  const oldNotes = pattern.flatMap(step => step.map(drum => patternEntryToSeedEntry(drum.pitch, step.index)))
+  const oldNotes = pattern.flatMap((step, stepIndex) => step.map(drum => patternEntryToSeedEntry(drum.pitch, stepIndex)))
   const ghostNotesToAdd = evenlySpacedPartitions(timesToAddGhostPitch).map(t => patternEntryToSeedEntry(ghostPitch, t))
   return seedFromSeedEntries(oldNotes, ghostNotesToAdd)
 }
