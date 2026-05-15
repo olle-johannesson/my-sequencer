@@ -6,12 +6,23 @@
 // menu exists) and again after start() succeeds (so labels are filled in).
 // `devicechange` events also re-populate so plug/unplug works live.
 
-import {outputSourceSelect} from './uiHandles.js'
+import {outputSourceRow, outputSourceSelect} from './uiHandles.js'
+import {isIOS} from '../util/platform.js'
 
 let onDeviceChange // caller's handler
 
 export function setupOutputSourceSelect(handler) {
   onDeviceChange = handler
+
+  // On iOS input and output are coupled to one physical device while
+  // `getUserMedia` is active — the input dropdown already covers both
+  // ends. Hide the separate output row entirely to avoid the confusing
+  // "Audio device" + "Output device" pair.
+  if (isIOS) {
+    const row = outputSourceRow()
+    if (row) row.hidden = true
+    return
+  }
 
   populateOutputSources()
   navigator.mediaDevices.addEventListener('devicechange', populateOutputSources)
