@@ -1,17 +1,17 @@
 import {allPresets, createEffectSwitch} from "./effects/effectSwitch.js";
 import {setupMasterBus} from "./audio/masterChain.js";
-import {addNewRecordedSample, clearMutationState, rescheduleOneOfTheRecordedSamples} from "./patternMutation.js";
-import {clearAllSamples, clearSample, samplePattern, samplePatternAge, scheduleSample} from "./patterns/samplePattern.js";
+import {addNewRecordedSample, clearMutationState, maybeReshuffle} from "./patternMutation.js";
+import {clearAllSamples, incrementPatternAge, samplePattern, scheduleAt as samplePatternScheduleAt} from "./patterns/samplePattern.js";
 import {getMicrophoneStream, setMicDeviceId, swapLiveMicTo} from "./audio/microphoneInput.js";
 import {populateInputSources, setupInputSourceSelect} from "./ui/inputSourceSelect.js";
 import {audioFeatureSAB, setupRecordingChain} from "./audio/recordingChain.js";
 import {setupInputMeter} from "./ui/inputMeter.js";
-import {getFilterAmount, setupSliders} from "./ui/sliders.js";
+import {setupSliders} from "./ui/sliders.js";
 import {setupKeyboardShortcuts} from "./ui/keyboardShortcuts.js";
 import {loadAudioWorklets, pauseAudioContext, startAudioContext} from "./audio/audioSetup.js";
-import {clearAllDrums, drumPattern, getCurrentPattern, initDrumPattern, updateDrumPattern} from "./patterns/drumPattern.js";
-import {bassPattern, clearAllBass, initBassPattern, updateBassPattern} from "./patterns/bassPattern.js";
-import {clearAllEffects, effectPattern, updateEffectPattern} from "./patterns/effectPattern.js";
+import {clearAllDrums, drumPattern, getCurrentPattern, initDrumPattern, scheduleAt as drumPatternScheduleAt, updateDrumPattern} from "./patterns/drumPattern.js";
+import {bassPattern, clearAllBass, initBassPattern, scheduleAt as bassPatternScheduleAt, updateBassPattern} from "./patterns/bassPattern.js";
+import {clearAllEffects, effectPattern, maybeMutateOnBar as maybeMutateEffectsOnBar} from "./patterns/effectPattern.js";
 import {resetCreep} from "./patterns/creep.js";
 import {setDiagnostic} from "./ui/messages.js";
 import {startMainThreadMonitor} from "./dev/mainThreadMonitor.js";
@@ -106,58 +106,29 @@ async function start() {
     // 3. Starting the loop
     startLoop(
       audioContext,
-      masterBus.in,
       samplePattern,
       drumPattern,
       bassPattern,
       effectPattern,
       {
+        scheduleSamples: samplePatternScheduleAt(audioContext, masterBus.in),
+        scheduleDrums:   drumPatternScheduleAt(audioContext, masterBus.in),
+        scheduleBass:    bassPatternScheduleAt(audioContext, masterBus.in),
+
         beforeEachCycle: barNumber => {
-          // This is called right before entering the next bar, so this function has to run fairly quickly.
-          // That means anything that takes time (e.g. ML pattern eval) should have been cached.
-
-          // Check manual slider input and update the effects accordingly
-          const filt = getFilterAmount()
-          const chance    = filt / 3
-          const intensity = Math.min(1, filt / 2)
-          if (Math.random() < chance) {
-            updateEffectPattern(Object.keys(allPresets), intensity)
-          }
-
-          // Keep things interesting. If there hasn't been anything recorded for a while,
-          // stir things up.
-          if (samplePatternAge > 1) {
-            rescheduleOneOfTheRecordedSamples(scheduleSample, clearSample)
-          }
-
-          // Every other bar we can adjust the drum pattern a bit, so it doesn't feel stale. Also, if the
-          // ML model has made a crap beat it doesn't last too long.
-          if (barNumber % 2 === 0) {
-            updateDrumPattern(audioContext)
-          }
-
-          // Bass regenerates at half the drum rate, on odd bars (drums run on
-          // even). Staggered so the two magenta calls never land on the same
-          // bar boundary. Diff-based pitch retention inside updateBassPattern
-          // keeps the line coherent across regens.
-          if (barNumber % 4 === 1) {
-            updateBassPattern(getCurrentPattern())
-          }
+          maybeMutateEffectsOnBar()
+          maybeReshuffle()
+          if (barNumber % 2 === 0) updateDrumPattern(audioContext)
+          if (barNumber % 4 === 1) updateBassPattern(getCurrentPattern())
         },
-
+        afterEachCycle: incrementPatternAge,
         onEffectChange: (newFx, _oldFx, time) => {
-          // When the looper changes effect it calls this, so it doesn't have to know how to change effects
           if (newFx) {
-            const def = typeof newFx === 'string'
-              ? allPresets[newFx] :
-              newFx
-            if (def) {
-              effectSwitch.activate(def.chain, def.preset, time, masterBus.in, masterBus.out)
-            }
+            const def = typeof newFx === 'string' ? allPresets[newFx] : newFx
+            if (def) effectSwitch.activate(def.chain, def.preset, time, masterBus.in, masterBus.out)
           } else {
             effectSwitch.deactivate(time)
           }
-          // keeping the video effects in sync with the audio effects
           setVideoEffect(typeof newFx === 'string' ? newFx : null)
         },
       })
@@ -170,7 +141,7 @@ async function start() {
         if (features) {
           showSampleInSlot(classification, features, classificationColor(classification))
         }
-        addNewRecordedSample(newRecordedSample, scheduleSample, clearSample, classification, features)
+        addNewRecordedSample(newRecordedSample, classification, features)
 
         // This also means that a useful thing was recorded, so this is a good place to reset
         // the inactivity creep

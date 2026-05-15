@@ -1,4 +1,6 @@
 import {addARegion, removeRandomRegion} from "../util/regionsOfAnArray.js";
+import {allPresets} from "../effects/effectSwitch.js";
+import {getFilterAmount} from "../ui/sliders.js";
 
 const scheduledFx = [...new Array(16)].map(() => null);
 
@@ -78,4 +80,21 @@ export function clearEffect(effect) {
  */
 export function clearAllEffects() {
   for (let i = 0; i < scheduledFx.length; i++) scheduledFx[i] = null
+}
+
+/**
+ * Per-bar gate around `updateEffectPattern`. Reads the filter slider —
+ * the user-facing "intensity knob for effect mutation" — and decides on
+ * each bar whether to fire a mutation, with its chance and intensity both
+ * scaling off that one value.
+ *
+ * Owned here rather than in main.js because both the *should it fire*
+ * gate and the *what does it do* mutation belong with the effect pattern.
+ */
+export function maybeMutateOnBar() {
+  const filterAmount = getFilterAmount()
+  const chance = filterAmount / 3
+  if (Math.random() >= chance) return
+  const intensity = Math.min(1, filterAmount / 2)
+  updateEffectPattern(Object.keys(allPresets), intensity)
 }
