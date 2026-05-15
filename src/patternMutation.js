@@ -58,7 +58,7 @@ export async function addNewRecordedSample(sample, scheduleSample, clearSample, 
   // Equip stable-pitched samples with a modulation table before they hit
   // the looper. WeakMap-keyed by buffer, so every scheduled occurrence of
   // this sample walks the same melodic cursor.
-  if (features?.sustained > 0.5 && features?.pitchStability < PITCHED_STABILITY_THRESHOLD) {
+  if (features?.sustained > 0.5 && features?.pitchStability > PITCHED_STABILITY_THRESHOLD) {
     const table = buildModulationTable(sample)
     setModulation(sample, table)
     console.info('modulation set', {
