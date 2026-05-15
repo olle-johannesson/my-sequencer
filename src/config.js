@@ -28,6 +28,16 @@ export const audioConfig = {
   // Base mixer level applied to every scheduled hit before per-step velocity
   // and the random "human factor" multiplier.
   baseGain: 0.8,
+
+  // Stddev of the per-hit gain wobble (`N(0, x)` added to the gain).
+  // Recorded samples are inherently more varied, so they take more wobble
+  // gracefully; drum-machine and bass hits are cleaner and start sounding
+  // sloppy with too much.
+  humanFactor: {
+    samples: 0.05,
+    drums: 0.025,
+    bass: 0.025,
+  },
 };
 
 // --- Creep — controls how the loop drifts when nothing fresh happens ------

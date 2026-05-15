@@ -1,6 +1,5 @@
 import {thunk} from "../util/thunk.js"
 import {getNormallyDistributedNumber} from "../util/random.js"
-import {playMonophonicSampleAt} from "../audio/samplePlayer.js"
 import {audioConfig} from "../config.js"
 import {nextModulation} from "./modulation.js"
 
@@ -11,28 +10,24 @@ const scheduledSamples = [...new Array(16)].map(() => new Set())
 
 export { scheduledSamples as samplePattern, patternAge as samplePatternAge }
 
-// Stddev of the per-hit gain wobble. Higher than drums because recorded
-// samples are inherently more varied — a bit of human-factor sounds
-// natural here; on drum-machine samples it'd just sound sloppy.
-const HUMAN_FACTOR_STDDEV = 0.05
-
 /**
- * Curried scheduler for the looper's `scheduleSamples` callback. Pass the
- * audio context + output node at startLoop time; the returned function
- * handles one step's worth of sample playback.
+ * Curried scheduler for the looper's `scheduleSamples` callback. The
+ * caller wires in the audio context, the output node, and the `play`
+ * function it wants used — playback is a side-effecting dependency, so
+ * it's explicit rather than imported here.
  *
  * Pitched samples walk their pentatonic modulation table here via
  * `nextModulation`; non-pitched ones return undefined and play whole-buffer
  * at natural rate.
  */
-export const scheduleAt = (audioContext, outputNode) => (time, samples, stepGain) => {
+export const scheduleAt = (audioContext, outputNode, play) => (time, samples, stepGain) => {
   samples
     .map(thunk)
     .filter(f => f instanceof AudioBuffer)
     .forEach(sample => {
-      const gain = audioConfig.baseGain * stepGain + getNormallyDistributedNumber(0, HUMAN_FACTOR_STDDEV)
+      const gain = audioConfig.baseGain * stepGain + getNormallyDistributedNumber(0, audioConfig.humanFactor.samples)
       const modulation = nextModulation(sample)
-      playMonophonicSampleAt(audioContext, sample, time, gain, outputNode, modulation)
+      play(audioContext, sample, time, gain, outputNode, modulation)
     })
 }
 

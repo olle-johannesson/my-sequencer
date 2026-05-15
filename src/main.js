@@ -16,7 +16,7 @@ import {resetCreep} from "./patterns/creep.js";
 import {setDiagnostic} from "./ui/messages.js";
 import {startMainThreadMonitor} from "./dev/mainThreadMonitor.js";
 import {startLoop, stopLoop} from "./looper.js";
-import {cancelAllScheduled} from "./audio/samplePlayer.js";
+import {cancelAllScheduled, playMonophonicSampleAt, playSampleAt} from "./audio/samplePlayer.js";
 import {attachEventListenersToAudioToggle, resetIsRecording, showIsRecording, showLoader} from "./ui/audioToggle.js";
 import {spectrumSize} from "./config.js";
 import {video} from "./ui/uiHandles.js";
@@ -102,9 +102,9 @@ async function start() {
       bassPattern,
       effectPattern,
       {
-        scheduleSamples: samplePatternScheduleAt(audioContext, masterBus.in),
-        scheduleDrums:   drumPatternScheduleAt(audioContext, masterBus.in),
-        scheduleBass:    bassPatternScheduleAt(audioContext, masterBus.in),
+        scheduleSamples: samplePatternScheduleAt(audioContext, masterBus.in, playMonophonicSampleAt),
+        scheduleDrums:   drumPatternScheduleAt(audioContext, masterBus.in, playSampleAt),
+        scheduleBass:    bassPatternScheduleAt(audioContext, masterBus.in, playMonophonicSampleAt),
 
         beforeEachCycle: barNumber => {
           maybeMutateEffectsOnBar()

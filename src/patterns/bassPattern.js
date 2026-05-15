@@ -7,11 +7,7 @@ import {DRUM_TO_PITCH} from "../drums/drumNameMaps.js"
 import {creepTemperature} from "./creep.js"
 import {binIndex} from "../util/bins.js";
 import {getNormallyDistributedNumber} from "../util/random.js"
-import {playMonophonicSampleAt} from "../audio/samplePlayer.js"
 import {audioConfig} from "../config.js"
-
-// Match drum-tightness — basslines feel like part of the rhythm section.
-const HUMAN_FACTOR_STDDEV = 0.025
 
 // Drum pitches whose onsets we treat as bass-pattern onsets. Kick is the
 // core; toms add occasional accents without flooding the bassline.
@@ -134,15 +130,15 @@ export function clearAllBass() {
 }
 
 /**
- * Curried scheduler for the looper's `scheduleBass` callback. Monophonic —
- * one bass note at a time, overlaps cross-fade via `playMonophonicSampleAt`.
- * Pitch (playbackRate) is baked into the bass entry at pattern-build time,
- * not picked at playback.
+ * Curried scheduler for the looper's `scheduleBass` callback. The caller
+ * supplies the `play` function — wire a monophonic one here so overlapping
+ * bass notes cross-fade rather than stack. Pitch (playbackRate) is baked
+ * into the bass entry at pattern-build time, not picked at playback.
  */
-export const scheduleAt = (audioContext, outputNode) => (time, bassEntry, stepGain) => {
-  const gain = audioConfig.baseGain * stepGain + getNormallyDistributedNumber(0, HUMAN_FACTOR_STDDEV)
+export const scheduleAt = (audioContext, outputNode, play) => (time, bassEntry, stepGain) => {
+  const gain = audioConfig.baseGain * stepGain + getNormallyDistributedNumber(0, audioConfig.humanFactor.bass)
   const {buffer, playbackRate} = bassEntry
-  playMonophonicSampleAt(audioContext, buffer, time, gain, outputNode, {playbackRate})
+  play(audioContext, buffer, time, gain, outputNode, {playbackRate})
 }
 
 /**

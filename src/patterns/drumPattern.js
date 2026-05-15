@@ -6,11 +6,7 @@ import {funkySeedPresets} from "../drums/beats/presets.js";
 import {loadSample} from "../drums/loadSample.js";
 import {thunk} from "../util/thunk.js";
 import {getNormallyDistributedNumber} from "../util/random.js";
-import {playSampleAt} from "../audio/samplePlayer.js";
 import {audioConfig} from "../config.js";
-
-// Drum machines are tighter than recorded samples — less human-factor.
-const HUMAN_FACTOR_STDDEV = 0.025
 
 let kit
 let scheduledDrums = [...new Array(16)].map(() => new Set())
@@ -59,17 +55,17 @@ export function clearAllDrums() {
 }
 
 /**
- * Curried scheduler for the looper's `scheduleDrums` callback. Polyphonic
- * by way of `playSampleAt` — drum hits stack on the same step (kick +
- * snare + hat).
+ * Curried scheduler for the looper's `scheduleDrums` callback. The caller
+ * supplies the `play` function — wire a polyphonic one here so drum hits
+ * can stack on the same step (kick + snare + hat).
  */
-export const scheduleAt = (audioContext, outputNode) => (time, drumSamples, stepGain) => {
+export const scheduleAt = (audioContext, outputNode, play) => (time, drumSamples, stepGain) => {
   drumSamples
     .map(thunk)
     .filter(f => f instanceof AudioBuffer)
     .forEach(drumSample => {
-      const gain = audioConfig.baseGain * stepGain + getNormallyDistributedNumber(0, HUMAN_FACTOR_STDDEV)
-      playSampleAt(audioContext, drumSample, time, gain, outputNode)
+      const gain = audioConfig.baseGain * stepGain + getNormallyDistributedNumber(0, audioConfig.humanFactor.drums)
+      play(audioContext, drumSample, time, gain, outputNode)
     })
 }
 
