@@ -8,6 +8,7 @@ import {createPitchChain, presets as pitchPresets} from "./pitchChain.js";
 import {bpm} from "../looper.js";
 import {thunk} from "../util/thunk.js";
 import {createRepeat, presets as repeatPresets} from "./repeat.js";
+import {setVideoEffect} from "./videoEffects.js";
 
 export const allPresets = {
   crunch: { chain: 'bitcrush', preset: bitcrushPresets.crunch },
@@ -85,4 +86,20 @@ export function createEffectSwitch(audioCtx) {
   }
 
   return {activate, deactivate};
+}
+
+/**
+ * Curried handler for the looper's `onEffectChange` callback. Resolves the
+ * incoming effect (a preset key or full def) into a chain config, drives
+ * the audio `effectSwitch` accordingly, and keeps the video effect in
+ * sync. The signature matches the looper's: `(newFx, _oldFx, time)`.
+ */
+export const handleEffectChangeAt = (effectSwitch, masterBus) => (newFx, _oldFx, time) => {
+  if (newFx) {
+    const def = typeof newFx === 'string' ? allPresets[newFx] : newFx
+    if (def) effectSwitch.activate(def.chain, def.preset, time, masterBus.in, masterBus.out)
+  } else {
+    effectSwitch.deactivate(time)
+  }
+  setVideoEffect(typeof newFx === 'string' ? newFx : null)
 }

@@ -1,4 +1,4 @@
-import {allPresets, createEffectSwitch} from "./effects/effectSwitch.js";
+import {createEffectSwitch, handleEffectChangeAt} from "./effects/effectSwitch.js";
 import {setupMasterBus} from "./audio/masterChain.js";
 import {addNewRecordedSample, clearMutationState, maybeReshuffle} from "./patternMutation.js";
 import {clearAllSamples, incrementPatternAge, samplePattern, scheduleAt as samplePatternScheduleAt} from "./patterns/samplePattern.js";
@@ -24,7 +24,7 @@ import {getVideoUrl} from "./ui/loadvideo.js";
 import {setVideoEffect} from "./effects/videoEffects.js";
 import {classificationColor, resetSampleSlots, setupMonitoringPanel, showSampleInSlot, surfaceStartError} from "./ui/monitoringPanel.js";
 
-let audioContext, microphoneStream, effectSwitch, /*drumSamples,*/ recordingChain, masterBus, hideLoader
+let audioContext, microphoneStream, effectSwitch, recordingChain, masterBus, hideLoader
 
 video().src = getVideoUrl()
 video().load();
@@ -43,45 +43,37 @@ setupInputSourceSelect(async (deviceId) => {
 })
 
 async function start() {
-  // Ok, a lot of things are going to happend now. Basically, there are 3 steps:
-  // 1. Set up the audio context and its worklets, as well as the microphone input and master output
-  // 2. Initialise a drum pattern with magenta
-  // 3. Start the loop
+  // Three steps:
+  // 1. Audio context, worklets, microphone, master bus.
+  // 2. Initial drum and bass patterns (magenta seeds the drums; bass seeds from the drums).
+  // 3. Start the loop.
   hideLoader = showLoader()
 
-  // 1. Setting up the audio context and all the workers, worklets, streams and monitoring
+  // 1. Audio context, worklets, microphone, master bus.
   try {
     if (audioContext) {
-      // If the audio context is already defined, we don't have to recreate it.
-      // The Microphone stream however, is destroyed on every pause. That is because if it is just paused
-      // the little microphone icon will still be displayed in the browser and perhaps also by the OS.
-      // Tearing down the whole microphone stream removes these. It is a performance loss to restart
-      // it every time, but I think it is worth it.
+      // Resuming an existing context. The microphone stream is torn down on
+      // every pause (so the browser's mic indicator goes away) and rebuilt
+      // here — a small performance hit, worth it for the UX.
       await audioContext.resume()
       microphoneStream = await getMicrophoneStream(microphoneStream)
       const newMicNode = new MediaStreamAudioSourceNode(audioContext, {mediaStream: microphoneStream})
       newMicNode.connect(recordingChain.tap)
       recordingChain.microphoneInputNode = newMicNode
     } else {
-
-      // If there is no audio context we make one. This is also the opportunity to create all the
-      // worklet nodes and reset the diagnostics.
+      // First start — build the whole graph from scratch.
       audioContext = await startAudioContext()
       setDiagnostic('outputLatency ms', audioContext.outputLatency * 1000)
       setDiagnostic('baseLatency ms', audioContext.baseLatency * 1000)
       setDiagnostic('sampleRate', audioContext.sampleRate)
       await loadAudioWorklets(audioContext);
 
-      // If there is no audio context there can be no microphone input stream or master output. Neither
-      // can there be worklets, so the effects will have to be set up also.
       [microphoneStream, effectSwitch, masterBus] = await Promise.all([
         getMicrophoneStream(microphoneStream),
         createEffectSwitch(audioContext),
         setupMasterBus(audioContext, spectrumSize)
       ]);
 
-      // Next up is the recording chain. These are also worklets and workers in tandem, sending messages and
-      // things like that.
       recordingChain = await setupRecordingChain(
         audioContext,
         microphoneStream,
@@ -90,20 +82,19 @@ async function start() {
           onRecordStop: resetIsRecording
         })
 
-      // Last thing to do is to check what input sources are available and make them selectable.
       populateInputSources()
     }
 
-    // 2. Setting up an initial drum pattern + bass pattern. Drum init runs
-    // in parallel with loading the bass sample; the bass *pattern* itself
-    // needs the drum continuation to seed from, so that has to wait.
+    // 2. Initial patterns. Drum init + bass-sample load can run in parallel;
+    // the bass *pattern* itself seeds from the drum continuation, so it
+    // has to wait for both.
     await Promise.all([
       initDrumPattern(audioContext),
       initBassPattern(audioContext),
     ])
     await updateBassPattern(getCurrentPattern())
 
-    // 3. Starting the loop
+    // 3. Start the loop.
     startLoop(
       audioContext,
       samplePattern,
@@ -122,33 +113,21 @@ async function start() {
           if (barNumber % 4 === 1) updateBassPattern(getCurrentPattern())
         },
         afterEachCycle: incrementPatternAge,
-        onEffectChange: (newFx, _oldFx, time) => {
-          if (newFx) {
-            const def = typeof newFx === 'string' ? allPresets[newFx] : newFx
-            if (def) effectSwitch.activate(def.chain, def.preset, time, masterBus.in, masterBus.out)
-          } else {
-            effectSwitch.deactivate(time)
-          }
-          setVideoEffect(typeof newFx === 'string' ? newFx : null)
-        },
+        onEffectChange: handleEffectChangeAt(effectSwitch, masterBus),
       })
 
+    // Triggered by the postprocess worker when a fresh recording survives
+    // the gates. Surface the features, place the sample, and reset creep
+    // (something useful happened, so the loop doesn't need to wander).
     recordingChain.startRecordingSamples(
       (newRecordedSample, classification, features) => {
-        // This is the callback triggered by return messages from the analysis worker thread.
-        // We display the analysis is the monitoring panel and schedule the new sample
-        // according to its classification
         if (features) {
           showSampleInSlot(classification, features, classificationColor(classification))
         }
         addNewRecordedSample(newRecordedSample, classification, features)
-
-        // This also means that a useful thing was recorded, so this is a good place to reset
-        // the inactivity creep
         resetCreep()
       })
 
-    // Phew! We made it all through the setup process! Now we can hide the loader and start playing the video.
     hideLoader()
     video().play();
 

@@ -126,9 +126,9 @@ function scheduler(audioContext, samplePattern, drumPattern, bassPattern, effect
       }
     }
 
-    // Now we can fire the schedule callbacks once per play time — the looper
-    // hands off the *what* (samples, drums, bass) and the *when* (each play
-    // time) and main.js's callbacks own the *how*.
+    // Fire the schedule callbacks once per play time — the looper hands
+    // off the *what* (samples, drums, bass) and the *when* (each play
+    // time); the callbacks own the *how*.
     const stepSamplesArr = Array.from(stepSamples)
     const drumSamplesArr = Array.from(drumSamples)
     for (const time of playTimes) {
