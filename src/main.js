@@ -2,7 +2,7 @@ import {createEffectSwitch, handleEffectChangeAt} from "./effects/effectSwitch.j
 import {setupMasterBus} from "./audio/masterChain.js";
 import {addNewRecordedSample, clearMutationState, maybeReshuffle} from "./patternMutation.js";
 import {clearAllSamples, incrementPatternAge, samplePattern, scheduleAt as samplePatternScheduleAt} from "./patterns/samplePattern.js";
-import {getMicrophoneStream, setMicDeviceId, swapLiveMicTo} from "./audio/microphoneInput.js";
+import {getMicrophoneStream, setMicDeviceId, setOnInputDeviceLost, swapLiveMicTo} from "./audio/microphoneInput.js";
 import {populateInputSources, setupInputSourceSelect} from "./ui/inputSourceSelect.js";
 import {populateOutputSources, setupOutputSourceSelect} from "./ui/outputSourceSelect.js";
 import {applyOutputDevice, setOnOutputDeviceLost, setOutputDeviceId} from "./audio/outputDevice.js";
@@ -52,15 +52,17 @@ setupOutputSourceSelect(async (deviceId) => {
   // Apply immediately if the audio chain is up; otherwise start() picks it up.
   if (audioContext) await applyOutputDevice(audioContext)
 })
-setOnOutputDeviceLost(() => {
-  // Pinned output went away (headphones turned off, jack pulled, etc.).
-  // Pause without touching pattern state — when the user presses play
-  // again we resume right where we were.
+// Pinned input or output device went away (USB pulled, Bluetooth off,
+// jack unplugged, etc.). Pause without touching pattern state — when the
+// user presses play again we resume right where we were.
+function pauseForDeviceLoss() {
   if (audioContext?.state === 'running') {
     softStop()
     syncToggleToPaused()
   }
-})
+}
+setOnOutputDeviceLost(pauseForDeviceLoss)
+setOnInputDeviceLost(pauseForDeviceLoss)
 
 async function start() {
   // Three steps:

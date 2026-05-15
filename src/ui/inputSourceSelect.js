@@ -74,9 +74,8 @@ export async function populateInputSources() {
   const allInputs = devices.filter(d => d.kind === 'audioinput')
   const defaultEntry = allInputs.find(d => d.deviceId === 'default')
 
-  let audioInputs = isIOS
-    ? dedupeByGroup(audioInputs)
-    : allInputs.filter(d => d.deviceId && d.deviceId !== 'default')
+  const physicalInputs = allInputs.filter(d => d.deviceId && d.deviceId !== 'default')
+  const audioInputs = isIOS ? dedupeByGroup(physicalInputs) : physicalInputs
 
   const previous = select.value
 

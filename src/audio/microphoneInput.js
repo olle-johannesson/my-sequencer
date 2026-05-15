@@ -1,6 +1,7 @@
 // The currently-selected input device id. null = browser default.
 // Set via the input-source dropdown; createMicrophoneStream honors it.
 let currentDeviceId = null
+let onDeviceLost = null
 
 export function setMicDeviceId(id) {
   currentDeviceId = id || null
@@ -9,6 +10,27 @@ export function setMicDeviceId(id) {
 export function getMicDeviceId() {
   return currentDeviceId
 }
+
+/**
+ * Register a callback to fire when the pinned input device disappears
+ * (USB mic unplugged, Bluetooth mic turned off, etc.). Mirrors
+ * `setOnOutputDeviceLost` — when we have no explicit pin (default mode),
+ * the listener stays quiet.
+ */
+export function setOnInputDeviceLost(handler) {
+  onDeviceLost = handler
+}
+
+navigator.mediaDevices?.addEventListener?.('devicechange', async () => {
+  if (!currentDeviceId) return
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    const stillPresent = devices.some(d => d.kind === 'audioinput' && d.deviceId === currentDeviceId)
+    if (!stillPresent) onDeviceLost?.()
+  } catch (e) {
+    console.warn('enumerateDevices failed during input device-loss check', e)
+  }
+})
 
 const baseAudioConstraints = {
   channelCount: 2,
