@@ -120,7 +120,6 @@ export async function updateDrumPattern(audioContext) {
 
   if (Math.random() < creepRevertChance()) {
     // exhale: snap back to the seed and start fresh
-    console.log('creep revert')
     nextPattern = seedPattern
     resetCreep()
   } else {
