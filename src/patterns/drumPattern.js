@@ -106,7 +106,6 @@ async function resolveDrum(audioContext, kit, drumPitch) {
 
 export async function initDrumPattern(audioContext) {
   const preset = funkySeedPresets[Math.floor(Math.random() * funkySeedPresets.length)]
-  // console.log('selected beat', preset.name)
 
   // Reset the per-slot sample cache when we (re)bind to a kit — otherwise a
   // previously-loaded sample under a slot would shadow this kit's version.
@@ -123,7 +122,6 @@ export async function initDrumPattern(audioContext) {
   setBpm(preset.bpm)
 
   nextPattern = await continuePattern(currentPattern, creepTemperature())
-  // nextPattern = seedPattern // await continuePattern(currentPattern, 0)
   nextOnsets = await toSampleOnsets(audioContext, kit, nextPattern)
   setDrumpattern(nextOnsets)
 }
@@ -156,29 +154,3 @@ export async function toSampleOnsets(audioContext, kit, pattern) {
     .filter(n => n.drum)
 }
 
-export function slightlyModifySeed(seed) {
-  const notes = [...seed.notes]
-  const selectedNoteIndex = Math.floor(Math.random() * notes.length)
-  const choice = Math.random()
-
-  if (choice < 0.33) {
-    // drop it
-    notes.splice(selectedNoteIndex, 1)
-  } else {
-    // micro shift
-    const shift = (Math.random() * 0.04) - 0.02
-    notes[selectedNoteIndex] = {
-      ...notes[selectedNoteIndex],
-      startTime: Math.max(0, notes[selectedNoteIndex].startTime + shift),
-      endTime: Math.max(
-        notes[selectedNoteIndex].startTime + 0.01,
-        notes[selectedNoteIndex].endTime + shift
-      ),
-    }
-  }
-
-  return {
-    ...seed,
-    notes,
-  }
-}

@@ -156,10 +156,6 @@ function scheduler(audioContext, samplePattern, drumPattern, bassPattern, effect
       currentBar++
     }
 
-    if (typeof callbacks.beforeNextStep === 'function') {
-      callbacks.beforeNextStep(currentStep, currentBar)
-    }
-
     nextStepTime += calculateStepDuration();
   }
 

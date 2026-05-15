@@ -23,12 +23,6 @@ function call(message) {
   })
 }
 
-export let magentaIsReady = true   // worker lazy-inits on first request
-
-export async function initMagenta() {
-  return call({ type: 'init' })
-}
-
 /**
  * @param seed {INoteSequence}
  * @param temperature {number}

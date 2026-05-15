@@ -273,7 +273,6 @@ onmessage = async (e) => {
 
       // Make sure we're not recording before updating the noise model.
       if ((recordingState === 0) && (rms < rmsThreshold)) {
-        // console.log(rms.toFixed(4), rmsThreshold.toFixed(4))
         updateNoiseModel(amplitudeSpectrum);
       }
 

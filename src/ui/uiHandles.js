@@ -25,7 +25,3 @@ export const messagesPre       = () => document.querySelector('#messages .messag
 // "expand-all" / "collapse-all" UX.
 export const allPanelDetails   = () => document.querySelectorAll('#panels details');
 
-// --- Legacy / dead --------------------------------------------------------
-// fxButtons used to drive a now-removed effect-tuning UI. Kept exported so
-// any straggler import keeps compiling; safe to delete once confirmed unused.
-export const fxButtons         = () => document.getElementById('fx')?.querySelectorAll('button');

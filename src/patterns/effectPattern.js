@@ -7,11 +7,11 @@ const scheduledFx = [...new Array(16)].map(() => null);
 export { scheduledFx as effectPattern }
 
 /**
- * Pick a small mutation: maybe drop a region, maybe add one. Caller passes the
- * pool of candidate effect keys plus an `intensity` (0..1) — typically the
- * current creepIntensity(). At intensity 0 the pattern stays sparse with
- * balanced add/remove and short regions; at intensity 1 effects accumulate
- * (mostly add) and regions are longer/more sustained.
+ * Pick a small mutation: maybe drop a region, maybe add one. Caller passes
+ * the pool of candidate effect keys plus an `intensity` (0..1). At
+ * intensity 0 the pattern stays sparse with balanced add/remove and short
+ * regions; at intensity 1 effects accumulate (mostly add) and regions are
+ * longer / more sustained.
  * @param candidateEffects {Array<any>}
  * @param {number} [intensity] 0..1; defaults to 0 (calm)
  */

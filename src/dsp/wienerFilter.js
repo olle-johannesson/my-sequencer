@@ -39,7 +39,6 @@ export function wienerDenoiseBuffer(input, localNoiseSpectrum, fftSize, hopSize,
     for (let i = 0; i < fftSize; i++) {
       frame[i] *= hannWindow[i];
     }
-    // console.log('zeroes', zeroes, 'total', frame.length)
     // De-noise the frame using the local noise spectrum.
     const yFrame = applyWienerToFrame(frame, localNoiseSpectrum, maxSuppressionDb);
     // When we have the result, we have to overlap the frames, just as we
