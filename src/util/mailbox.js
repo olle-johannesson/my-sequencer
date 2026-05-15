@@ -6,6 +6,12 @@
 // Reader (analysis-reader worklet) checks the Int32 seq counter for freshness.
 // If you add a slot, bump FEATURE_COUNT *and* update the writer in
 // analysis.worker.js — the SAB layout is shared, not policed.
+//
+// The seq counter is an Int32 advanced by `(s + 1) | 0` after every write, so
+// it wraps cleanly at ~2.1B. Readers compare for inequality (not >), which
+// stays correct across the wrap. At the analysis worker's ~43 Hz block rate
+// that's roughly 1.6 years of continuous running before a single wrap —
+// noted, not handled.
 export const FEATURE_COUNT = 4;
 
 export function createFeatureMailboxViews(sharedArrayBuffer) {

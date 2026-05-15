@@ -1,8 +1,9 @@
 import {addARegion, removeRandomRegion} from "../util/regionsOfAnArray.js";
 import {allPresets} from "../effects/effectSwitch.js";
 import {getFilterAmount} from "../ui/sliders.js";
+import {STEPS_PER_BAR} from "../config.js";
 
-const scheduledFx = [...new Array(16)].map(() => null);
+const scheduledFx = [...new Array(STEPS_PER_BAR)].map(() => null);
 
 export { scheduledFx as effectPattern }
 

@@ -4,6 +4,7 @@ import {evenlySpacedPartitions} from "./util/evenlySpacedPartitions.js";
 import {GHOST_PITCHES_BY_CLASS, MAGENTA_DRUM_CLASSES} from "./drums/drumNameMaps.js";
 import {buildModulationTable, setModulation} from "./patterns/modulation.js";
 import {clearSample, samplePatternAge, scheduleSample} from "./patterns/samplePattern.js";
+import {STEPS_PER_BAR} from "./config.js";
 
 // Pitch-stability score above which a recorded sample is treated as a
 // sustained pitched source — gets equipped with a pentatonic modulation
@@ -175,10 +176,10 @@ const getQuantizedStartStepsForPitch = async (seed, pitch, temperature = 1.5) =>
  * @param pitch {number}
  * @param meanNumberOfTimesToAdd {number}
  * @param stddev {number}
- * @param numberOfSteps {number} defaults to 16
+ * @param numberOfSteps {number} defaults to STEPS_PER_BAR
  * @return {number[]}
  */
-const randomlyAssignQuantizedStartSteps = (pitch, meanNumberOfTimesToAdd, stddev, numberOfSteps = 16) => {
+const randomlyAssignQuantizedStartSteps = (pitch, meanNumberOfTimesToAdd, stddev, numberOfSteps = STEPS_PER_BAR) => {
   const numberOfTimesToAddSample = Math.round(getNormallyDistributedNumber(meanNumberOfTimesToAdd, stddev));
   return [...new Array(numberOfTimesToAddSample)]
     .map(() => Math.floor(Math.random() * numberOfSteps))
@@ -193,8 +194,8 @@ const randomlyAssignQuantizedStartSteps = (pitch, meanNumberOfTimesToAdd, stddev
  */
 const patternEntryToSeedEntry = (pitch, index) => ({
   pitch,
-  startTime: index / 16.0,
-  endTime: Math.min(index / 16 + 0.5, 1.0)
+  startTime: index / STEPS_PER_BAR,
+  endTime: Math.min(index / STEPS_PER_BAR + 0.5, 1.0)
 })
 
 

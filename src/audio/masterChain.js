@@ -52,6 +52,13 @@ export function setupMasterBus(audioContext, spectrumSize) {
   };
 }
 
+// Cached IR data so we don't burn ~140k × 2 Math.random + Math.pow ops on
+// every start(). Keyed by sample rate (the only thing that actually varies
+// in practice — the device-change case re-creates the audio context but
+// usually with the same rate). Float-array data is context-agnostic; we
+// rebind it onto a fresh AudioBuffer per session.
+const irCache = new Map()
+
 /**
  * Synthetic impulse response: stereo white noise with an exponential decay
  * envelope. Cheap, no asset, and tunable: `durationSec` controls tail length,
@@ -61,12 +68,20 @@ export function setupMasterBus(audioContext, spectrumSize) {
 function generateImpulseResponse(audioContext, durationSec, decay) {
   const sampleRate = audioContext.sampleRate;
   const length = Math.floor(sampleRate * durationSec);
-  const ir = audioContext.createBuffer(2, length, sampleRate);
-  for (let ch = 0; ch < 2; ch++) {
-    const data = ir.getChannelData(ch);
-    for (let i = 0; i < length; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+  const cacheKey = `${sampleRate}|${durationSec}|${decay}`
+  let cached = irCache.get(cacheKey)
+  if (!cached) {
+    cached = [new Float32Array(length), new Float32Array(length)]
+    for (let ch = 0; ch < 2; ch++) {
+      const data = cached[ch]
+      for (let i = 0; i < length; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+      }
     }
+    irCache.set(cacheKey, cached)
   }
+  const ir = audioContext.createBuffer(2, length, sampleRate);
+  ir.copyToChannel(cached[0], 0)
+  ir.copyToChannel(cached[1], 1)
   return ir;
 }

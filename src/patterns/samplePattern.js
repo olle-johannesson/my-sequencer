@@ -1,12 +1,12 @@
 import {thunk} from "../util/thunk.js"
 import {getNormallyDistributedNumber} from "../util/random.js"
-import {audioConfig} from "../config.js"
+import {audioConfig, STEPS_PER_BAR} from "../config.js"
 import {nextModulation} from "./modulation.js"
 
 let patternAge = 0
 // `const` enforces the invariant that the looper relies on: the reference is
 // captured at startLoop and must stay stable. Mutate slots in place instead.
-const scheduledSamples = [...new Array(16)].map(() => new Set())
+const scheduledSamples = [...new Array(STEPS_PER_BAR)].map(() => new Set())
 
 export { scheduledSamples as samplePattern, patternAge as samplePatternAge }
 

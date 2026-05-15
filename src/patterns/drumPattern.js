@@ -6,10 +6,10 @@ import {funkySeedPresets} from "../drums/beats/presets.js";
 import {loadSample} from "../drums/loadSample.js";
 import {thunk} from "../util/thunk.js";
 import {getNormallyDistributedNumber} from "../util/random.js";
-import {audioConfig} from "../config.js";
+import {audioConfig, STEPS_PER_BAR} from "../config.js";
 
 let kit
-let scheduledDrums = [...new Array(16)].map(() => new Set())
+let scheduledDrums = [...new Array(STEPS_PER_BAR)].map(() => new Set())
 let seedPattern        // the freshly quantized seed, kept around so we can snap back to it
 let currentPattern
 let nextPattern

@@ -1,4 +1,5 @@
 import {chartDiagnostic} from "./ui/messages.js"
+import {STEPS_PER_BAR} from "./config.js"
 
 const worker = new Worker(new URL('./workers/magenta.worker.js', import.meta.url), { type: 'module' })
 
@@ -58,10 +59,10 @@ export function quantizeSeed(seed) {
     ...seed,
     notes: seed.notes.map(n => ({
       ...n,
-      quantizedStartStep: Math.round(n.startTime * 16) % 16,
-      quantizedEndStep: Math.round(n.endTime * 16),
+      quantizedStartStep: Math.round(n.startTime * STEPS_PER_BAR) % STEPS_PER_BAR,
+      quantizedEndStep: Math.round(n.endTime * STEPS_PER_BAR),
     })),
     quantizationInfo: { stepsPerQuarter: 4 },
-    totalQuantizedSteps: 16,
+    totalQuantizedSteps: STEPS_PER_BAR,
   }
 }

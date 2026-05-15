@@ -130,11 +130,9 @@ export async function setupRecordingChain(audioContext, microphoneStream, callBa
         break;
       case 'rec begin':
         callBacks?.onRecordStart?.()
-        // audioToggleLabel.classList.add('recording');
         break;
       case 'rec end':
         callBacks?.onRecordStop?.()
-        // audioToggleLabel.classList.remove('recording');
         break;
     }
   };

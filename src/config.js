@@ -12,6 +12,14 @@
 export const analysisBlockSize = 1024;
 export const spectrumSize = analysisBlockSize / 2;
 
+// --- Pattern grid ----------------------------------------------------------
+// 16 sixteenth-notes to a bar. Every pattern array is this long; every step
+// index lives in [0, STEPS_PER_BAR). Hard invariant — multi-bar support was
+// removed when the codebase committed to a uniform 16-step grid. Mutate
+// pattern slots in place; never reassign the array (the looper captures
+// the reference at startLoop).
+export const STEPS_PER_BAR = 16;
+
 // --- Looper / scheduler ----------------------------------------------------
 export const audioConfig = {
   // How far ahead of `audioContext.currentTime` we keep scheduling. Bigger

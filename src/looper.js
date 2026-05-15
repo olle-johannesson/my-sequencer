@@ -1,5 +1,5 @@
 import {repeatState} from "./effects/repeat.js";
-import {audioConfig} from "./config.js";
+import {audioConfig, STEPS_PER_BAR} from "./config.js";
 
 export let bpm = 96;
 let isRunning = false
@@ -7,10 +7,9 @@ let currentStep = 0
 let currentBar = 0
 let nextStepTime = undefined
 let lastEffect = null
-let swingByStep = new Array(16).fill(0)
+let swingByStep = new Array(STEPS_PER_BAR).fill(0)
 
 const stepsPerBeat = 4;
-const STEPS_PER_BAR = 16;
 const calculateStepDuration = () => 60 / bpm / stepsPerBeat;
 const velocityByStep = [
   1.0, 0.5, 0.8, 0.5,
@@ -21,7 +20,7 @@ const velocityByStep = [
 
 
 export function setSwing(perStepFractions) {
-  swingByStep = new Array(16).fill(0)
+  swingByStep = new Array(STEPS_PER_BAR).fill(0)
   if (!perStepFractions) return
   for (const [step, fraction] of Object.entries(perStepFractions)) {
     swingByStep[+step] = fraction
@@ -159,6 +158,9 @@ function scheduler(audioContext, samplePattern, drumPattern, bassPattern, effect
     nextStepTime += calculateStepDuration();
   }
 
-  setTimeout(() => scheduler(audioContext, samplePattern, drumPattern, bassPattern, effectPattern, callbacks), 10);
+  // 30 ms is plenty given a 100 ms look-ahead; below ~4 ms most browsers
+  // clamp anyway, and bg-tab throttling kicks in regardless. The wider
+  // gap saves wasted wake-ups without any audible cost.
+  setTimeout(() => scheduler(audioContext, samplePattern, drumPattern, bassPattern, effectPattern, callbacks), 30);
 }
 
