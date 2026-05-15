@@ -33,9 +33,11 @@ export const audioConfig = {
 // --- Creep — controls how the loop drifts when nothing fresh happens ------
 export const creepConfig = {
   // Magenta sampling temperature ramps from base + 0 (musical) to
-  // base + range (chaotic) over tempHalfBars worth of bars.
+  // base + range. Capped at 1.5 — above that, the drum RNN starts
+  // emitting note salads. Compounded across regens (each continuation
+  // seeds the next), so even 0.5 of range is plenty of drift.
   tempBase: 1.0,
-  tempRange: 1.0,
+  tempRange: 0.5,
   tempHalfBars: 32,
 
   // Per-bar probability that the effect pattern mutates. Climbs from 0 to
@@ -44,9 +46,11 @@ export const creepConfig = {
   fxHalfBars: 64,
 
   // Per-bar probability of "snapping back" to the original seed pattern,
-  // used to exhale after a long drift.
-  revertMaxChance: 0.4,
-  revertHalfBars: 66,
+  // used to exhale after a long drift. Tightened so the loop re-anchors
+  // before it spirals — by ~20 bars (≈ 50 s at 96 BPM) the revert chance
+  // is climbing fast enough that long stretches of chaos are unlikely.
+  revertMaxChance: 0.6,
+  revertHalfBars: 20,
 };
 
 // --- Recording trigger — start/stop detection in the analysis worker -----
