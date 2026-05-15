@@ -20,13 +20,17 @@ let onDeviceChange  // caller's handler
 export function setupInputSourceSelect(handler) {
   onDeviceChange = handler
 
-  if (isIOS) relabelForIOS()
+  if (isIOS) {
+    relabelForIOS()
+  }
 
   populateInputSources()
   navigator.mediaDevices.addEventListener('devicechange', populateInputSources)
 
   const select = inputSourceSelect()
-  if (!select) return
+  if (!select) {
+    return
+  }
   select.addEventListener('change', () => {
     onDeviceChange?.(select.value || null)
   })
@@ -34,7 +38,9 @@ export function setupInputSourceSelect(handler) {
 
 function relabelForIOS() {
   const select = inputSourceSelect()
-  if (!select) return
+  if (!select) {
+    return
+  }
   const label = inputSourceLabel()
   if (label) label.textContent = 'Audio device'
 
@@ -50,7 +56,9 @@ function relabelForIOS() {
 
 export async function populateInputSources() {
   const select = inputSourceSelect()
-  if (!select) return
+  if (!select) {
+    return
+  }
 
   let devices = []
   try {
@@ -60,18 +68,19 @@ export async function populateInputSources() {
     return
   }
 
-  let audioInputs = devices.filter(d => d.kind === 'audioinput')
-  if (isIOS) audioInputs = dedupeByGroup(audioInputs)
+  // Keep the 'default' virtual entry around (before dedupe and filter) so
+  // we can resolve which physical device is currently the system default
+  // via its groupId. The dropdown itself only shows real devices.
+  const allInputs = devices.filter(d => d.kind === 'audioinput')
+  const defaultEntry = allInputs.find(d => d.deviceId === 'default')
+
+  let audioInputs = isIOS
+    ? dedupeByGroup(audioInputs)
+    : allInputs.filter(d => d.deviceId && d.deviceId !== 'default')
 
   const previous = select.value
 
-  // Default option for "let the browser pick" — value="" means no exact deviceId.
-  const defaultOpt = document.createElement('option')
-  defaultOpt.value = ''
-  defaultOpt.textContent = 'Default'
-
   select.replaceChildren(
-    defaultOpt,
     ...audioInputs.map(d => {
       const opt = document.createElement('option')
       opt.value = d.deviceId
@@ -82,6 +91,22 @@ export async function populateInputSources() {
 
   if (previous && audioInputs.some(d => d.deviceId === previous)) {
     select.value = previous
+    return
+  }
+
+  // No previous selection — show whichever physical device the system is
+  // currently routed to. If the 'default' entry isn't available
+  // (pre-permission, or browsers that don't expose it), fall back to the
+  // first listed device.
+  if (defaultEntry) {
+    const physical = audioInputs.find(d => d.groupId === defaultEntry.groupId)
+    if (physical) {
+      select.value = physical.deviceId
+      return
+    }
+  }
+  if (audioInputs.length > 0) {
+    select.value = audioInputs[0].deviceId
   }
 }
 

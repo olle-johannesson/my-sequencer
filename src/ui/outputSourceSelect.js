@@ -35,16 +35,16 @@ export async function populateOutputSources() {
     return
   }
 
-  const audioOutputs = devices.filter(d => d.kind === 'audiooutput')
+  // Keep the 'default' virtual entry separately — we need its groupId to
+  // resolve which physical device is currently the system default, but
+  // we don't want it in the dropdown (the dropdown shows real devices).
+  const all = devices.filter(d => d.kind === 'audiooutput')
+  const defaultEntry = all.find(d => d.deviceId === 'default')
+  const audioOutputs = all.filter(d => d.deviceId && d.deviceId !== 'default')
+
   const previous = select.value
 
-  // Default option for "let the browser pick" — value="" means no exact deviceId.
-  const defaultOpt = document.createElement('option')
-  defaultOpt.value = ''
-  defaultOpt.textContent = 'Default'
-
   select.replaceChildren(
-    defaultOpt,
     ...audioOutputs.map(d => {
       const opt = document.createElement('option')
       opt.value = d.deviceId
@@ -55,5 +55,21 @@ export async function populateOutputSources() {
 
   if (previous && audioOutputs.some(d => d.deviceId === previous)) {
     select.value = previous
+    return
+  }
+
+  // No previous selection — show whichever physical device the system is
+  // currently routed to (the 'default' entry's groupId points us there).
+  // If the entry isn't available (pre-permission, or a browser that
+  // doesn't expose it), fall back to the first listed device.
+  if (defaultEntry) {
+    const physical = audioOutputs.find(d => d.groupId === defaultEntry.groupId)
+    if (physical) {
+      select.value = physical.deviceId
+      return
+    }
+  }
+  if (audioOutputs.length > 0) {
+    select.value = audioOutputs[0].deviceId
   }
 }
