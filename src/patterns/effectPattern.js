@@ -1,15 +1,18 @@
 import {addARegion, removeRandomRegion} from "../util/regionsOfAnArray.js";
+import {allPresets} from "../effects/effectSwitch.js";
+import {getFilterAmount} from "../ui/sliders.js";
+import {STEPS_PER_BAR} from "../config.js";
 
-const scheduledFx = [...new Array(16)].map(() => null);
+const scheduledFx = [...new Array(STEPS_PER_BAR)].map(() => null);
 
 export { scheduledFx as effectPattern }
 
 /**
- * Pick a small mutation: maybe drop a region, maybe add one. Caller passes the
- * pool of candidate effect keys plus an `intensity` (0..1) — typically the
- * current creepIntensity(). At intensity 0 the pattern stays sparse with
- * balanced add/remove and short regions; at intensity 1 effects accumulate
- * (mostly add) and regions are longer/more sustained.
+ * Pick a small mutation: maybe drop a region, maybe add one. Caller passes
+ * the pool of candidate effect keys plus an `intensity` (0..1). At
+ * intensity 0 the pattern stays sparse with balanced add/remove and short
+ * regions; at intensity 1 effects accumulate (mostly add) and regions are
+ * longer / more sustained.
  * @param candidateEffects {Array<any>}
  * @param {number} [intensity] 0..1; defaults to 0 (calm)
  */
@@ -78,4 +81,21 @@ export function clearEffect(effect) {
  */
 export function clearAllEffects() {
   for (let i = 0; i < scheduledFx.length; i++) scheduledFx[i] = null
+}
+
+/**
+ * Per-bar gate around `updateEffectPattern`. Reads the filter slider —
+ * the user-facing "intensity knob for effect mutation" — and decides on
+ * each bar whether to fire a mutation, with its chance and intensity both
+ * scaling off that one value.
+ *
+ * Owned here rather than in main.js because both the *should it fire*
+ * gate and the *what does it do* mutation belong with the effect pattern.
+ */
+export function maybeMutateOnBar() {
+  const filterAmount = getFilterAmount()
+  const chance = filterAmount / 3
+  if (Math.random() >= chance) return
+  const intensity = Math.min(1, filterAmount / 2)
+  updateEffectPattern(Object.keys(allPresets), intensity)
 }

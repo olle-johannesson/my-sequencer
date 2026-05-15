@@ -3,6 +3,8 @@ import {getNormallyDistributedNumber} from "./util/random.js";
 import {evenlySpacedPartitions} from "./util/evenlySpacedPartitions.js";
 import {GHOST_PITCHES_BY_CLASS, MAGENTA_DRUM_CLASSES} from "./drums/drumNameMaps.js";
 import {buildModulationTable, setModulation} from "./patterns/modulation.js";
+import {clearSample, samplePatternAge, scheduleSample} from "./patterns/samplePattern.js";
+import {STEPS_PER_BAR} from "./config.js";
 
 // Pitch-stability score above which a recorded sample is treated as a
 // sustained pitched source — gets equipped with a pentatonic modulation
@@ -50,24 +52,15 @@ let samplePattern = [
  * After we have used all the ghost pitches we start to recycle them.
  *
  * @param sample
- * @param scheduleSample {(index: number, sample: AudioBuffer) => void}
- * @param clearSample {(sample: AudioBuffer) => void}
  * @param classification {string}
+ * @param features {object=}
  */
-export async function addNewRecordedSample(sample, scheduleSample, clearSample, classification = MAGENTA_DRUM_CLASSES.percussive, features) {
+export async function addNewRecordedSample(sample, classification = MAGENTA_DRUM_CLASSES.percussive, features) {
   // Equip stable-pitched samples with a modulation table before they hit
   // the looper. WeakMap-keyed by buffer, so every scheduled occurrence of
   // this sample walks the same melodic cursor.
   if (features?.sustained > 0.5 && features?.pitchStability > PITCHED_STABILITY_THRESHOLD) {
-    const table = buildModulationTable(sample)
-    setModulation(sample, table)
-    console.info('modulation set', {
-      pitchHz: features.pitchHz,
-      pitchStability: features.pitchStability,
-      bufferDuration: sample.duration,
-      sliceMs: Math.round((sample.duration / table.entries.length) * 1000),
-      rates: table.entries.map(e => e.playbackRate.toFixed(3)),
-    })
+    setModulation(sample, buildModulationTable(sample))
   }
 
   const suitableGhostPitches = GHOST_PITCHES_BY_CLASS[classification]
@@ -82,11 +75,27 @@ export async function addNewRecordedSample(sample, scheduleSample, clearSample, 
   })
 }
 
-export function rescheduleOneOfTheRecordedSamples(scheduleSample, clearSample) {
+export function rescheduleOneOfTheRecordedSamples() {
   const samples = samplePattern.flatMap(step => step.map(d => d.sample))
   let randomSample = samples[Math.floor(Math.random() * samples.length)]
   clearSample(randomSample)
-  addNewRecordedSample(randomSample, scheduleSample, clearSample)
+  addNewRecordedSample(randomSample)
+}
+
+/**
+ * Bar-tick gate around `rescheduleOneOfTheRecordedSamples`. If the looper
+ * has been chewing on the same sample pattern for more than a bar without
+ * anything fresh being added, stir things up — pluck one of the existing
+ * recordings and re-place it via magenta.
+ *
+ * Owned here rather than in main.js because the "have we gone stale?"
+ * question reads from `samplePatternAge`, and the "what do we do about it"
+ * lives in this module.
+ */
+export function maybeReshuffle() {
+  if (samplePatternAge > 1) {
+    rescheduleOneOfTheRecordedSamples()
+  }
 }
 
 /**
@@ -167,10 +176,10 @@ const getQuantizedStartStepsForPitch = async (seed, pitch, temperature = 1.5) =>
  * @param pitch {number}
  * @param meanNumberOfTimesToAdd {number}
  * @param stddev {number}
- * @param numberOfSteps {number} defaults to 16
+ * @param numberOfSteps {number} defaults to STEPS_PER_BAR
  * @return {number[]}
  */
-const randomlyAssignQuantizedStartSteps = (pitch, meanNumberOfTimesToAdd, stddev, numberOfSteps = 16) => {
+const randomlyAssignQuantizedStartSteps = (pitch, meanNumberOfTimesToAdd, stddev, numberOfSteps = STEPS_PER_BAR) => {
   const numberOfTimesToAddSample = Math.round(getNormallyDistributedNumber(meanNumberOfTimesToAdd, stddev));
   return [...new Array(numberOfTimesToAddSample)]
     .map(() => Math.floor(Math.random() * numberOfSteps))
@@ -185,8 +194,8 @@ const randomlyAssignQuantizedStartSteps = (pitch, meanNumberOfTimesToAdd, stddev
  */
 const patternEntryToSeedEntry = (pitch, index) => ({
   pitch,
-  startTime: index / 16.0,
-  endTime: Math.min(index / 16 + 0.5, 1.0)
+  startTime: index / STEPS_PER_BAR,
+  endTime: Math.min(index / STEPS_PER_BAR + 0.5, 1.0)
 })
 
 

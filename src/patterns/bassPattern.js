@@ -6,6 +6,8 @@ import {evenlySpacedPartitions} from "../util/evenlySpacedPartitions.js"
 import {DRUM_TO_PITCH} from "../drums/drumNameMaps.js"
 import {creepTemperature} from "./creep.js"
 import {binIndex} from "../util/bins.js";
+import {getNormallyDistributedNumber} from "../util/random.js"
+import {audioConfig, STEPS_PER_BAR} from "../config.js"
 
 // Drum pitches whose onsets we treat as bass-pattern onsets. Kick is the
 // core; toms add occasional accents without flooding the bassline.
@@ -98,7 +100,7 @@ let currentBassBuffer = null
 // One slot per step. `null` = no bass on this step. Otherwise:
 // `{buffer, playbackRate}` — the looper hands the playbackRate straight
 // through to playSampleAt's modulation parameter.
-const scheduledBass = new Array(16).fill(null)
+const scheduledBass = new Array(STEPS_PER_BAR).fill(null)
 export {scheduledBass as bassPattern}
 
 // Pre-computed bass pattern, ready to promote on the next regen tick.
@@ -128,6 +130,18 @@ export function clearAllBass() {
 }
 
 /**
+ * Curried scheduler for the looper's `scheduleBass` callback. The caller
+ * supplies the `play` function — wire a monophonic one here so overlapping
+ * bass notes cross-fade rather than stack. Pitch (playbackRate) is baked
+ * into the bass entry at pattern-build time, not picked at playback.
+ */
+export const scheduleAt = (audioContext, outputNode, play) => (time, bassEntry, stepGain) => {
+  const gain = audioConfig.baseGain * stepGain + getNormallyDistributedNumber(0, audioConfig.humanFactor.bass)
+  const {buffer, playbackRate} = bassEntry
+  play(audioContext, buffer, time, gain, outputNode, {playbackRate})
+}
+
+/**
  * Continue a drum pattern through magenta, but inject a few evenly-spaced
  * ghost kicks into the seed first so the continuation tends to elaborate
  * on kick activity. Same ghost-pitch trick patternMutation uses for sample
@@ -137,10 +151,10 @@ export function clearAllBass() {
  * @returns {Promise<INoteSequence>}
  */
 async function continueDrumPatternWithGhostKicks(seedDrumPattern) {
-  const ghostNotes = evenlySpacedPartitions(GHOST_KICK_COUNT, 16).map(step => ({
+  const ghostNotes = evenlySpacedPartitions(GHOST_KICK_COUNT, STEPS_PER_BAR).map(step => ({
     pitch: KICK_PITCH,
-    startTime: step / 16.0,
-    endTime: Math.min(step / 16 + 0.5, 1.0),
+    startTime: step / STEPS_PER_BAR,
+    endTime: Math.min(step / STEPS_PER_BAR + 0.5, 1.0),
     quantizedStartStep: step,
     quantizedEndStep: step + 1,
   }))
@@ -217,7 +231,7 @@ function lastPlayedRate(pattern) {
 async function computeNextBassPattern(seedDrumPattern, seedBassPattern) {
   const drumContinuation = await continueDrumPatternWithGhostKicks(seedDrumPattern)
   const onsets = extractOnsets(drumContinuation, BASS_LIKE_DRUM_PITCHES)
-  const next = new Array(16).fill(null)
+  const next = new Array(STEPS_PER_BAR).fill(null)
   let prevRate = lastPlayedRate(seedBassPattern)
   for (const step of onsets) {
     next[step] = pitchOnsetWithContext(step, seedBassPattern, prevRate)

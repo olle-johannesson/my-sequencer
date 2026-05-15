@@ -5,15 +5,6 @@ import bitcrusherWorkletUrl from '../worklets/bitcrusher.worklet.js?worker&url'
 import grainPlayerWorkletUrl from '../worklets/grain-player.worklet.js?worker&url'
 import pitchshiftWorkletUrl from '../worklets/pitchshift.worklet.js?worker&url'
 
-/**
- * Create an audio context and load all the worklets
- */
-export async function setupAudioContext() {
-  const audioContext = startAudioContext()
-  await loadAudioWorklets(audioContext)
-  return audioContext;
-}
-
 export function startAudioContext() {
   return new (window.AudioContext || window.webkitAudioContext)({
     latencyHint: 'playback'

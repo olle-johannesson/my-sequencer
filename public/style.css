@@ -1,3 +1,27 @@
+/* =========================================================================
+ * JS-toggled class / state hooks
+ * =========================================================================
+ * These classes/attributes are set or removed at runtime by JS. If you
+ * restyle anything that touches them, check that the JS-driven behaviour
+ * still works.
+ *
+ *   body.audio-started          set in main.js once the audio chain is up;
+ *                               drives play/pause/mic icon swap on #hold.
+ *   #hold.disco                 added while audio is playing
+ *                               (audioToggle.js). No CSS rule today —
+ *                               reserved for future visual cue.
+ *   #hold.recording             added during a take (audioToggle.js).
+ *                               No CSS rule today — reserved for future
+ *                               visual cue.
+ *   span.loader                 created by audioToggle.js#showLoader during
+ *                               startup; styled by `.loader` below.
+ *   video#bkg-video.fx-stutter  added by effects/videoEffects.js while the
+ *                               stutter/grain audio effect is active.
+ *   video#bkg-video.fx-reverse  added by effects/videoEffects.js for the
+ *                               reverse-grain effect.
+ *   <details>[open]             keyboardShortcuts.js#onEscape clears `open`
+ *                               on every panel <details> on Escape.
+ * ========================================================================= */
 :root {
     --bg-color-start: white;
     --bg-color-end:   white;

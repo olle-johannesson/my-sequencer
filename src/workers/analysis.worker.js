@@ -263,7 +263,13 @@ onmessage = async (e) => {
       spectralCentroid  = spectralCentroid  || 0;
       spectralFlatness  = spectralFlatness  || 0;
 
-      // Calibration period: force recording off for first ~1 second to learn noise floor
+      // Calibration period: force recording off for the first ~1 s of the
+      // worker's life so the noise model gets a clean baseline. Sticky —
+      // once we cross the threshold this branch is dead for the rest of
+      // the worker's lifetime, including across user start/stop cycles
+      // (the worker persists between sessions). The hysteresis gate state
+      // similarly persists; if you ever start tearing the worker down on
+      // stop(), reset both here.
       if (calibrationFrames < 40) {
         calibrationFrames++;
         recordingState = 0;
@@ -273,7 +279,6 @@ onmessage = async (e) => {
 
       // Make sure we're not recording before updating the noise model.
       if ((recordingState === 0) && (rms < rmsThreshold)) {
-        // console.log(rms.toFixed(4), rmsThreshold.toFixed(4))
         updateNoiseModel(amplitudeSpectrum);
       }
 

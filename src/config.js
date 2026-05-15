@@ -12,6 +12,14 @@
 export const analysisBlockSize = 1024;
 export const spectrumSize = analysisBlockSize / 2;
 
+// --- Pattern grid ----------------------------------------------------------
+// 16 sixteenth-notes to a bar. Every pattern array is this long; every step
+// index lives in [0, STEPS_PER_BAR). Hard invariant — multi-bar support was
+// removed when the codebase committed to a uniform 16-step grid. Mutate
+// pattern slots in place; never reassign the array (the looper captures
+// the reference at startLoop).
+export const STEPS_PER_BAR = 16;
+
 // --- Looper / scheduler ----------------------------------------------------
 export const audioConfig = {
   // How far ahead of `audioContext.currentTime` we keep scheduling. Bigger
@@ -28,6 +36,16 @@ export const audioConfig = {
   // Base mixer level applied to every scheduled hit before per-step velocity
   // and the random "human factor" multiplier.
   baseGain: 0.8,
+
+  // Stddev of the per-hit gain wobble (`N(0, x)` added to the gain).
+  // Recorded samples are inherently more varied, so they take more wobble
+  // gracefully; drum-machine and bass hits are cleaner and start sounding
+  // sloppy with too much.
+  humanFactor: {
+    samples: 0.05,
+    drums: 0.025,
+    bass: 0.025,
+  },
 };
 
 // --- Creep — controls how the loop drifts when nothing fresh happens ------

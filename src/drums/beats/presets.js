@@ -12,6 +12,7 @@ import {DRUM_TO_PITCH} from "../drumNameMaps.js";
 import {KRmini} from "../kits/KRmini.js";
 import {HR16b} from "../kits/HR16b.js";
 import {VL1} from "../kits/VL1.js";
+import {STEPS_PER_BAR} from "../../config.js";
 
 const note = (pitch, startTime, duration) => ({pitch: DRUM_TO_PITCH[pitch], startTime, endTime: startTime + duration})
 const k = t => note('kick', t, 0.10)
@@ -44,7 +45,7 @@ const R8Sidestick = {
  *
  * @param {function[][]} p
  */
-let interpretPattern = p => p.flatMap((drums, sixteenth) => drums.map(f => f(sixteenth / 16)))
+let interpretPattern = p => p.flatMap((drums, sixteenth) => drums.map(f => f(sixteenth / STEPS_PER_BAR)))
 
 export const funkySeedPresets = [
   {

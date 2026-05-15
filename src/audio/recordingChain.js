@@ -1,7 +1,5 @@
 import {audioBufferFromSAB} from "../dsp/audioBufferFromFloatArray.js";
 import {FEATURE_COUNT} from "../util/mailbox.js";
-import {scheduleEffect as scheduleSample} from "../patterns/effectPattern.js";
-import {clearSample} from "../patterns/samplePattern.js";
 import {analysisBlockSize, spectrumSize} from '../config.js'
 import {chartDiagnostic, setDiagnostic} from '../ui/messages.js'
 
@@ -32,8 +30,6 @@ analysisWorker.addEventListener('message', (e) => {
 
 const postProcessWorker = new Worker(new URL('../workers/postprocess.worker.js', import.meta.url), {type: 'module'});
 postProcessWorker.onerror = (e) => console.error('post-process Worker error', e);
-// postProcessWorker.onmessage = (e) =>
-//   addNewRecordedSample(audioBufferFromSAB(audioContext, e.data.samples), scheduleSample, clearSample)
 
 // shared buffers
 export const audioFeatureSAB = new SharedArrayBuffer(
@@ -134,11 +130,9 @@ export async function setupRecordingChain(audioContext, microphoneStream, callBa
         break;
       case 'rec begin':
         callBacks?.onRecordStart?.()
-        // audioToggleLabel.classList.add('recording');
         break;
       case 'rec end':
         callBacks?.onRecordStop?.()
-        // audioToggleLabel.classList.remove('recording');
         break;
     }
   };
