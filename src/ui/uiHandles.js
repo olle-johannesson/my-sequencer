@@ -12,7 +12,7 @@ export const inputSourceSelect = () => document.getElementById('input-source');
 export const inputSourceLabel  = () => document.querySelector('label[for="input-source"]');
 export const inputSourceNote   = () => document.getElementById('input-source-note');
 export const inputMeter        = () => document.getElementById('input-meter');
-export const sensitivityGauge  = () => document.getElementById('sensisitivity-gauge');
+export const sensitivityGauge  = () => document.getElementById('sensitivity-gauge');
 export const filterGauge       = () => document.getElementById('filter-gauge');
 
 // --- Monitoring panel -------------------------------------------------------
