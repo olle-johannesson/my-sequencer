@@ -1,34 +1,31 @@
 import {continuePattern} from "./magentaHelper.js";
 import {getNormallyDistributedNumber} from "./util/random.js";
 import {evenlySpacedPartitions} from "./util/evenlySpacedPartitions.js";
-import {DRUM_TO_PITCH, GHOST_PITCHES_BY_CLASS, MAGENTA_DRUM_CLASSES} from "./drums/drumNameMaps.js";
+import {GHOST_PITCHES_BY_CLASS, MAGENTA_DRUM_CLASSES} from "./drums/drumNameMaps.js";
+import {buildModulationTable, setModulation} from "./patterns/modulation.js";
 
-const maxAttemptsToScheduleNewSample = 5
-const maxSamples = 5
-const maxEffects = 3
-let nextSample = 0
-let nextEffect = 0
+// Pitch-stability score above which a recorded sample is treated as a
+// sustained pitched source — gets equipped with a pentatonic modulation
+// table that the looper walks across the bar. 0.6 is the initial guess;
+// re-tune against real recordings.
+const PITCHED_STABILITY_THRESHOLD = 0.1
 
-// DrumsRNN-friendly “filler” pitches
-const goodFillerPitches = [
-  45, // Low Tom
-  48, // Mid Tom
-  50, // High Tom
-  42, // Closed Hat (nice as a “clicky” filler)
-  46, // Open Hat
-  49, // Crash
-  51, // Ride
-];
-
-const pitchesNotCollidingWithTheFillerPitches = [
-  72, 73, 74, 75,
-  76, 77, 78, 79,
-  80, 81, 82, 83,
-  84, 85, 86, 87,
-  88, 89, 90, 91,
-];
+// Each retry is an awaited magenta round-trip inside `beforeEachCycle`. The
+// looper's catch-up snap masks the audible damage, but a high cap can drop
+// whole bars on slower hardware. 2 attempts is enough that the random
+// fallback rarely triggers in practice.
+const maxAttemptsToScheduleNewSample = 2
 
 /**
+ * Local mirror of the looper's sample-pattern, but with pitch info attached
+ * (the looper's array is just AudioBuffers in Sets — no pitch). We keep this
+ * around so we can build magenta seeds that include the recorded samples
+ * under their assigned ghost pitch — that's how each new recording slots
+ * into the pattern in a magenta-friendly way.
+ *
+ * Cleared by clearMutationState() on stop, so recordings don't leak across
+ * sessions.
+ *
  * @type {*[{ pitch: number, sample: AudioBuffer }][]}
  */
 let samplePattern = [
@@ -37,25 +34,6 @@ let samplePattern = [
   [], [], [], [],
   [], [], [], []
 ]
-
-let effectPattern = [
-  0, 0, 0, 0,
-  0, 0, 0, 0,
-  0, 0, 0, 0,
-  0, 0, 0, 0,
-]
-
-export const aConservativeSeed = {
-  // boom chack boom-boom chack
-  notes: [
-    {pitch: DRUM_TO_PITCH.kick, startTime: 0, endTime: 0.25},
-    {pitch: DRUM_TO_PITCH.snare, startTime: 0.25, endTime: 0.5},
-    {pitch: DRUM_TO_PITCH.kick, startTime: 0.5, endTime: 0.75},
-    {pitch: DRUM_TO_PITCH.kick, startTime: 0.625, endTime: 0.75},
-    {pitch: DRUM_TO_PITCH.snare, startTime: 0.75, endTime: 1.0},
-  ],
-  totalTime: 1.0,
-}
 
 
 /**
@@ -76,7 +54,22 @@ export const aConservativeSeed = {
  * @param clearSample {(sample: AudioBuffer) => void}
  * @param classification {string}
  */
-export async function addNewRecordedSample(sample, scheduleSample, clearSample, classification = MAGENTA_DRUM_CLASSES.percussive) {
+export async function addNewRecordedSample(sample, scheduleSample, clearSample, classification = MAGENTA_DRUM_CLASSES.percussive, features) {
+  // Equip stable-pitched samples with a modulation table before they hit
+  // the looper. WeakMap-keyed by buffer, so every scheduled occurrence of
+  // this sample walks the same melodic cursor.
+  if (features?.sustained > 0.5 && features?.pitchStability < PITCHED_STABILITY_THRESHOLD) {
+    const table = buildModulationTable(sample)
+    setModulation(sample, table)
+    console.info('modulation set', {
+      pitchHz: features.pitchHz,
+      pitchStability: features.pitchStability,
+      bufferDuration: sample.duration,
+      sliceMs: Math.round((sample.duration / table.entries.length) * 1000),
+      rates: table.entries.map(e => e.playbackRate.toFixed(3)),
+    })
+  }
+
   const suitableGhostPitches = GHOST_PITCHES_BY_CLASS[classification]
   const ghostPitch = suitableGhostPitches[Math.floor(Math.random() * suitableGhostPitches.length)]
 
@@ -96,30 +89,18 @@ export function rescheduleOneOfTheRecordedSamples(scheduleSample, clearSample) {
   addNewRecordedSample(randomSample, scheduleSample, clearSample)
 }
 
-export async function continueEffectPattern(scheduleEffect, clearAllEffects) {
-  const ghostPitchIndex = ++nextEffect % pitchesNotCollidingWithTheFillerPitches.length
-  const ghostPitch = pitchesNotCollidingWithTheFillerPitches[ghostPitchIndex]
-
-  const oldNotes = effectPattern.map((pitch, i) => pitch ? patternEntryToSeedEntry(pitch) : null).filter(Boolean)
-  const ghostNotesToAdd = evenlySpacedPartitions(2).map(t => patternEntryToSeedEntry(ghostPitch, t))
-  const seed = seedFromSeedEntries(oldNotes, ghostNotesToAdd)
-  const quantizedStartSteps = await getQuantizedStartStepsForPitch(seed, ghostPitch, 0.003)
-  effectPattern = effectPattern.map((pitch, index) => {
-    if (quantizedStartSteps.includes(index)) {
-      return ghostPitch
-    } else if (pitch + maxEffects < ghostPitch) {
-      return 0
-    } else {
-      return pitch
-    }
-  })
-
-  clearAllEffects()
-  effectPattern.forEach((pitch, index) => {
-    if (pitch >= pitchesNotCollidingWithTheFillerPitches[0]) {
-      scheduleEffect(index, pitch - pitchesNotCollidingWithTheFillerPitches[0])
-    }
-  })
+/**
+ * Reset the magenta-seed mirror. Called from stop() — without it, recorded
+ * samples from a previous session persist here and get re-injected into the
+ * next session via rescheduleOneOfTheRecordedSamples.
+ */
+export function clearMutationState() {
+  samplePattern = [
+    [], [], [], [],
+    [], [], [], [],
+    [], [], [], [],
+    [], [], [], []
+  ]
 }
 
 
@@ -151,7 +132,7 @@ const clearPitchFromPattern = (pitch, pattern, callBackWithSampleWhenPitchIsFoun
  * @return {INoteSequence}
  */
 const makeSeedWithGhostPitchFromPattern = (ghostPitch, pattern, timesToAddGhostPitch = 2) => {
-  const oldNotes = pattern.flatMap(step => step.map(drum => patternEntryToSeedEntry(drum.pitch, step.index)))
+  const oldNotes = pattern.flatMap((step, stepIndex) => step.map(drum => patternEntryToSeedEntry(drum.pitch, stepIndex)))
   const ghostNotesToAdd = evenlySpacedPartitions(timesToAddGhostPitch).map(t => patternEntryToSeedEntry(ghostPitch, t))
   return seedFromSeedEntries(oldNotes, ghostNotesToAdd)
 }

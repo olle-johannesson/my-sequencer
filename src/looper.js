@@ -3,6 +3,7 @@ import {getNormallyDistributedNumber} from "./util/random.js";
 import {playMonophonicSampleAt, playSampleAt} from "./audio/samplePlayer.js";
 import {repeatState} from "./effects/repeat.js";
 import {incrementPatternAge} from "./patterns/samplePattern.js";
+import {nextModulation} from "./patterns/modulation.js";
 import {audioConfig} from "./config.js";
 
 export let bpm = 96;
@@ -38,10 +39,10 @@ export function setBpm(newBpm) {
   }
 }
 
-export function startLoop(audioContext, outputNode, samplePattern, drumPattern, effectPattern, callbacks = {}) {
+export function startLoop(audioContext, outputNode, samplePattern, drumPattern, bassPattern, effectPattern, callbacks = {}) {
   isRunning = true
   lastEffect = null
-  scheduler(audioContext, outputNode, samplePattern, drumPattern, effectPattern, callbacks)
+  scheduler(audioContext, outputNode, samplePattern, drumPattern, bassPattern, effectPattern, callbacks)
 }
 
 export function stopLoop() {
@@ -63,7 +64,7 @@ export function stopLoop() {
 // In this case, I use setTimeout instead, since that will keep running also when the page is out of focus,
 // such as if the tab is switched in the browser. It also allows us to run the recursion a bit more sparsely,
 // offloading the setTimeout lag potential to the offset scheduling time instead.
-function scheduler(audioContext, outputNode, samplePattern, drumPattern, effectPattern, callbacks = {}) {
+function scheduler(audioContext, outputNode, samplePattern, drumPattern, bassPattern, effectPattern, callbacks = {}) {
 
   // Safety latch to prevent doing things after clicking 'stop'
   if (!isRunning) {
@@ -99,13 +100,14 @@ function scheduler(audioContext, outputNode, samplePattern, drumPattern, effectP
     // Now we can get to work scheduling samples!
     // First, we look into the sample patterns we have established to see what samples should be
     // scheduled for this 16th, as well as which effect we have scheduled.
-    const stepSamples = samplePattern[currentStep % samplePattern.length] ?? new Set()
+    const stepSamples = samplePattern[currentStep] ?? new Set()
     const drumSamples = drumPattern[currentStep] ?? new Set()
-    const currentEffect = effectPattern?.[currentStep % effectPattern.length] ?? null
+    const bassEntry   = bassPattern?.[currentStep] ?? null
+    const currentEffect = effectPattern?.[currentStep] ?? null
 
     // The base volume and swing factor for this 16th can be established at this point
-    const stepVelocity = velocityByStep[currentStep % velocityByStep.length] ?? 1;
-    const swingFactor = swingByStep[currentStep % swingByStep.length]
+    const stepVelocity = velocityByStep[currentStep];
+    const swingFactor = swingByStep[currentStep]
 
     // We map the samples to functions that will schedule them at time t. This gives us an opportunity
     // to call thunks, weed out potential null returns or other cruft, and further refine the volume
@@ -116,7 +118,11 @@ function scheduler(audioContext, outputNode, samplePattern, drumPattern, effectP
       .map(sample => {
         const humanFactor = getNormallyDistributedNumber(0, 0.05);
         const gain = audioConfig.baseGain * stepVelocity + humanFactor;
-        return t => playMonophonicSampleAt(audioContext, sample, t, gain, outputNode)
+        // Pitched samples walk their pentatonic table here; non-pitched
+        // samples return undefined and play at natural rate. Captured
+        // into the closure so any stutter-repeats below share the pick.
+        const modulation = nextModulation(sample)
+        return t => playMonophonicSampleAt(audioContext, sample, t, gain, outputNode, modulation)
       })
 
     // Now the same for the drum samples. It's pretty much the same, but with a bit more
@@ -130,6 +136,18 @@ function scheduler(audioContext, outputNode, samplePattern, drumPattern, effectP
         return t => playSampleAt(audioContext, sample, t, gain, outputNode)
       })
 
+    // Bass: zero or one entry per step. Pitch (playbackRate) is baked into
+    // the pattern at regen time, not picked at playback. Monophonic — bass
+    // notes interrupt the previous one when they overlap.
+    const bassToPlay = bassEntry && bassEntry.buffer instanceof AudioBuffer
+      ? [(() => {
+          const humanFactor = getNormallyDistributedNumber(0, 0.025);
+          const gain = audioConfig.baseGain * stepVelocity + humanFactor;
+          const {buffer, playbackRate} = bassEntry
+          return t => playMonophonicSampleAt(audioContext, buffer, t, gain, outputNode, {playbackRate})
+        })()]
+      : []
+
     // Before we schedule the samples we can bastardise the timing of the next step a little bit.
     // Like introducing swing. This is a bit crude way to do it (could have used trigonometry or
     // something), but it does the trick. A simple fraction of the bpm is added to the time of
@@ -139,7 +157,7 @@ function scheduler(audioContext, outputNode, samplePattern, drumPattern, effectP
 
     // Now that we have the time for the next batch of samples calculated out, we can go
     // ahead and schedule all of them.
-    ;[...samplesToPlay, ...drumsToPlay].forEach(job => job(stepPlayTime))
+    ;[...samplesToPlay, ...drumsToPlay, ...bassToPlay].forEach(job => job(stepPlayTime))
 
     // If we are to change effect, we can do that now. This is handled in a callback,
     // so we simply call that, taking no responsibility in this function for whatever
@@ -158,16 +176,13 @@ function scheduler(audioContext, outputNode, samplePattern, drumPattern, effectP
       let repeatTime = stepPlayTime + repeatInterval;
 
       while (repeatTime < stepPlayTime + calculateStepDuration()) {
-        ;[...samplesToPlay, ...drumsToPlay].forEach(job => job(repeatTime))
+        ;[...samplesToPlay, ...drumsToPlay, ...bassToPlay].forEach(job => job(repeatTime))
         repeatTime += repeatInterval;
       }
     }
 
-    // Wrap on the longest pattern (drumPattern), so multi-bar presets play
-    // through fully before restarting. currentBar / patternAge tick on the
-    // musical-bar cadence (every 16 steps) regardless of drum length.
-    currentStep = (currentStep + 1) % drumPattern.length;
-    if (currentStep % STEPS_PER_BAR === 0) {
+    currentStep = (currentStep + 1) % STEPS_PER_BAR;
+    if (currentStep === 0) {
       currentBar++
       incrementPatternAge()
     }
@@ -179,6 +194,6 @@ function scheduler(audioContext, outputNode, samplePattern, drumPattern, effectP
     nextStepTime += calculateStepDuration();
   }
 
-  setTimeout(() => scheduler(audioContext, outputNode, samplePattern, drumPattern, effectPattern, callbacks), 10);
+  setTimeout(() => scheduler(audioContext, outputNode, samplePattern, drumPattern, bassPattern, effectPattern, callbacks), 10);
 }
 

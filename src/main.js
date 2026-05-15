@@ -1,6 +1,6 @@
 import {allPresets, createEffectSwitch} from "./effects/effectSwitch.js";
 import {setupMasterBus} from "./audio/masterChain.js";
-import {addNewRecordedSample, rescheduleOneOfTheRecordedSamples} from "./patternMutation.js";
+import {addNewRecordedSample, clearMutationState, rescheduleOneOfTheRecordedSamples} from "./patternMutation.js";
 import {clearAllSamples, clearSample, samplePattern, samplePatternAge, scheduleSample} from "./patterns/samplePattern.js";
 import {getMicrophoneStream, setMicDeviceId, swapLiveMicTo} from "./audio/microphoneInput.js";
 import {populateInputSources, setupInputSourceSelect} from "./ui/inputSourceSelect.js";
@@ -9,7 +9,8 @@ import {setupInputMeter} from "./ui/inputMeter.js";
 import {getFilterAmount, setupSliders} from "./ui/sliders.js";
 import {setupKeyboardShortcuts} from "./ui/keyboardShortcuts.js";
 import {loadAudioWorklets, pauseAudioContext, startAudioContext} from "./audio/audioSetup.js";
-import {clearAllDrums, drumPattern, initDrumPattern, updateDrumPattern} from "./patterns/drumPattern.js";
+import {clearAllDrums, drumPattern, getCurrentPattern, initDrumPattern, updateDrumPattern} from "./patterns/drumPattern.js";
+import {bassPattern, clearAllBass, initBassPattern, updateBassPattern} from "./patterns/bassPattern.js";
 import {clearAllEffects, effectPattern, updateEffectPattern} from "./patterns/effectPattern.js";
 import {resetCreep} from "./patterns/creep.js";
 import {setDiagnostic} from "./ui/messages.js";
@@ -21,7 +22,7 @@ import {spectrumSize} from "./config.js";
 import {video} from "./ui/uiHandles.js";
 import {getVideoUrl} from "./ui/loadvideo.js";
 import {setVideoEffect} from "./effects/videoEffects.js";
-import {classificationColor, setupMonitoringPanel, showSampleInSlot, surfaceStartError} from "./ui/monitoringPanel.js";
+import {classificationColor, resetSampleSlots, setupMonitoringPanel, showSampleInSlot, surfaceStartError} from "./ui/monitoringPanel.js";
 
 let audioContext, microphoneStream, effectSwitch, /*drumSamples,*/ recordingChain, masterBus, hideLoader
 
@@ -37,7 +38,7 @@ setupInputSourceSelect(async (deviceId) => {
   setMicDeviceId(deviceId)
   // Live-swap only makes sense if the audio chain is up.
   if (audioContext && recordingChain) {
-    await swapLiveMicTo(audioContext, microphoneStream, recordingChain, deviceId)
+    microphoneStream = await swapLiveMicTo(audioContext, microphoneStream, recordingChain, deviceId)
   }
 })
 
@@ -93,8 +94,14 @@ async function start() {
       populateInputSources()
     }
 
-    // 2. Setting up an initial drum pattern
-    await initDrumPattern(audioContext)
+    // 2. Setting up an initial drum pattern + bass pattern. Drum init runs
+    // in parallel with loading the bass sample; the bass *pattern* itself
+    // needs the drum continuation to seed from, so that has to wait.
+    await Promise.all([
+      initDrumPattern(audioContext),
+      initBassPattern(audioContext),
+    ])
+    await updateBassPattern(getCurrentPattern())
 
     // 3. Starting the loop
     startLoop(
@@ -102,6 +109,7 @@ async function start() {
       masterBus.in,
       samplePattern,
       drumPattern,
+      bassPattern,
       effectPattern,
       {
         beforeEachCycle: barNumber => {
@@ -126,6 +134,14 @@ async function start() {
           // ML model has made a crap beat it doesn't last too long.
           if (barNumber % 2 === 0) {
             updateDrumPattern(audioContext)
+          }
+
+          // Bass regenerates at half the drum rate, on odd bars (drums run on
+          // even). Staggered so the two magenta calls never land on the same
+          // bar boundary. Diff-based pitch retention inside updateBassPattern
+          // keeps the line coherent across regens.
+          if (barNumber % 4 === 1) {
+            updateBassPattern(getCurrentPattern())
           }
         },
 
@@ -154,7 +170,7 @@ async function start() {
         if (features) {
           showSampleInSlot(classification, features, classificationColor(classification))
         }
-        addNewRecordedSample(newRecordedSample, scheduleSample, clearSample, classification)
+        addNewRecordedSample(newRecordedSample, scheduleSample, clearSample, classification, features)
 
         // This also means that a useful thing was recorded, so this is a good place to reset
         // the inactivity creep
@@ -192,7 +208,10 @@ async function safeStop() {
   masterBus = undefined
   try { clearAllSamples() } catch {}
   try { clearAllDrums() } catch {}
+  try { clearAllBass() } catch {}
   try { clearAllEffects() } catch {}
+  try { clearMutationState() } catch {}
+  try { resetSampleSlots() } catch {}
   try { setVideoEffect(null) } catch {}
   hideLoader?.()
 }
@@ -210,7 +229,10 @@ async function stop() {
   await pauseAudioContext(audioContext)
   clearAllSamples()
   clearAllDrums()
+  clearAllBass()
   clearAllEffects()
+  clearMutationState()
+  resetSampleSlots()
   setVideoEffect(null)
   video().pause();
   hideLoader()

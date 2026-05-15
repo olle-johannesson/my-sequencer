@@ -16,6 +16,19 @@ let noiseRms = 0;
 let recordingState = 0;
 let calibrationFrames = 0;
 
+// Loudest RMS observed during the current take. Reset to 0 every time
+// recording starts (state 0 → 1) and grown monotonically while recording.
+// Used by recordingDecision to compute a peak-relative stop threshold.
+let recordingPeakRms = 0;
+
+// Per-take stats used to detect "this is a sustained take" early on, then
+// extend the hysteresis exit window for the rest of the take so vibrato /
+// breath dips don't cut it off. We watch spectral flatness rather than flux
+// because vocals can be fluxy (vibrato) but stay tonal (low flatness).
+let recordingFrameCount = 0;
+let recordingFlatnessSum = 0;
+let currentExitLimit = recordingConfig.minFramesBelow;
+
 const hysteresisGate = createConsecutiveGate(
   recordingConfig.minFramesAbove,
   recordingConfig.minFramesBelow,
@@ -129,14 +142,50 @@ function recordingDecision(rms, flux, flatness, centroid) {
   // Higher sensitivity = lower threshold (so quieter input triggers).
   // Multiplier is inverse: 4x more sensitive halves the threshold.
   const startThreshold = rmsThreshold * recordingConfig.startFactor / sensitivityMultiplier;
-  const stopThreshold  = rmsThreshold * recordingConfig.stopFactor  / sensitivityMultiplier;
+  const noiseRelativeStop = rmsThreshold * recordingConfig.stopFactor / sensitivityMultiplier;
+
+  // Track the loudest moment of *this take* and stop when the level falls
+  // below that fraction. Combined with the noise-relative stop via max() —
+  // so loud takes have to drop way below their own peak before they cut
+  // (full release tail), while quiet takes still terminate at the noise
+  // floor as before.
+  if (recordingState === 1 && rms > recordingPeakRms) recordingPeakRms = rms;
+  const peakRelativeStop = recordingPeakRms * recordingConfig.peakStopFraction;
+  const stopThreshold = Math.max(noiseRelativeStop, peakRelativeStop);
+
+  // Sustained-take detection: accumulate spectral flatness for the first
+  // sustainedDetectFrames frames; right at that point, lift the gate's
+  // exit window if the take has been tonal (low flatness = sparse spectrum
+  // = voice / sustained synth). Voice can be fluxy from vibrato yet stay
+  // tonal, which is why flatness is the better signal here.
+  if (recordingState === 1) {
+    recordingFrameCount++;
+    recordingFlatnessSum += flatness;
+    if (recordingFrameCount === recordingConfig.sustainedDetectFrames) {
+      const avgFlatness = recordingFlatnessSum / recordingFrameCount;
+      currentExitLimit = avgFlatness < recordingConfig.sustainedFlatnessThreshold
+        ? recordingConfig.sustainedExitFrames
+        : recordingConfig.minFramesBelow;
+    }
+  }
+
   // Reject if any DISCARD_PROFILE matches the current frame's features.
   // Profiles needing post-classify-only features (lowRatio, decayTime, …)
   // never match here — those undefined values fail every comparison.
   const junk = matchDiscardProfile({rms, flux, flatness, centroid})
   const enterCond = !junk && rms > startThreshold && flux > 0.05;
   const exitCond  = rms < stopThreshold //  || flux < 0.02;
-  return hysteresisGate(enterCond, exitCond)
+  const next = hysteresisGate(enterCond, exitCond, undefined, currentExitLimit)
+
+  // Reset per-take state when recording finishes, so the next take starts
+  // fresh.
+  if (recordingState === 1 && next === 0) {
+    recordingPeakRms = 0;
+    recordingFrameCount = 0;
+    recordingFlatnessSum = 0;
+    currentExitLimit = recordingConfig.minFramesBelow;
+  }
+  return next
 }
 
 /**

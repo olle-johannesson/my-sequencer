@@ -27,44 +27,47 @@ const FIGURE_KEYS = [
   'inter-msg avg ms',
 ]
 
+const SAMPLE_SLOTS = 5
+let sampleSlotIndex = 0
+
 export function setupMonitoringPanel() {
   for (const key of FIGURE_KEYS) {
     setDiagnostic(key, '—', 'rgba(128,128,128,0.7)')
   }
+  resetSampleSlots()
+}
 
-  const SAMPLE_SLOTS = 5
-
-  let sampleSlotIndex = 0
-
+/**
+ * Reset the recorded-sample diagnostic rows back to "empty". Called on stop
+ * so the panel doesn't keep displaying samples from a session that's no
+ * longer playing.
+ */
+export function resetSampleSlots() {
+  sampleSlotIndex = 0
   for (let i = 0; i < SAMPLE_SLOTS; i++) {
     setDiagnostic(`sample ${i}`, '— empty —', 'rgba(128,128,128,0.4)')
   }
 }
 
-for (const key of FIGURE_KEYS) {
-  setDiagnostic(key, '—', 'rgba(128,128,128,0.7)')
-}
-
-const SAMPLE_SLOTS = 5
-
-let sampleSlotIndex = 0
-
-for (let i = 0; i < SAMPLE_SLOTS; i++) {
-  setDiagnostic(`sample ${i}`, '— empty —', 'rgba(128,128,128,0.4)')
-}
-
 export function showSampleInSlot(classification, features, color) {
   const items = [
-    {value: features.duration,         max: 2},
-    {value: features.decayTime,        max: 1},
-    {value: features.lowRatio,         max: 1},
-    {value: features.highRatio,        max: 1},
-    {value: features.spectralCentroid, max: 10000},
-    {value: features.spectralFlatness, max: 1},
+    {value: features.duration,            max: 2},
+    {value: features.decayTime,           max: 1},
+    {value: features.lowRatio,            max: 1},
+    {value: features.highRatio,           max: 1},
+    {value: features.centroid,            max: 10000},
+    {value: features.flatness,            max: 1},
+    {value: features.sustained ?? 0,      max: 1},
+    {value: features.pitchHz ?? 0,        max: 4000},
+    {value: features.pitchStability ?? 0, max: 1},
   ]
   const slot = sampleSlotIndex % SAMPLE_SLOTS
   sampleSlotIndex++
-  setDiagnostic(`sample ${slot}`, `${classification.padEnd(13)} ${sparkline(items)}`, color)
+  // Trailing numbers spell out pitchHz + pitchStability — sparkline is too
+  // coarse for the gates we care about (e.g. 0.6 threshold for modulation).
+  const pHz = features.pitchHz ? `${Math.round(features.pitchHz)}Hz` : '—'
+  const pS  = features.pitchStability != null ? features.pitchStability.toFixed(2) : '—'
+  setDiagnostic(`sample ${slot}`, `${classification.padEnd(13)} ${sparkline(items)}  ${pHz} s=${pS}`, color)
 }
 
 export function surfaceStartError(e) {

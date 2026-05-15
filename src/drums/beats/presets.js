@@ -1,7 +1,6 @@
 import {Kawaii} from "../kits/Kawaii.js";
 import {SDS5} from "../kits/SDS5.js";
 import {CR78} from "../kits/CR78.js";
-import {LINN9000} from "../kits/LINN9000.js";
 import {TR808} from "../kits/TR-808.js";
 import {TR909} from "../kits/TR-909.js";
 import {Drumulator} from "../kits/Drumulator.js";
@@ -277,25 +276,7 @@ export const funkySeedPresets = [
       totalTime: 1.0,
     },
   },
-  {
-    name: 'Cold Sweat',
-    kit: LINN9000,
-    bpm: 122,
-    seed: {
-      notes: interpretPattern([
-        [k,hc],[],[ho],[],
-        [s,hc],[],[hc],[],
-        [k,hc],[],[k,ho],[],
-        [hc],[],[s,hc],[],
 
-        [hc],[],[k,ho],[],
-        [s,hc],[],[hc],[],
-        [k,hc],[],[k,ho],[],
-        [s,hc],[],[hc],[],
-      ]),
-      totalTime: 2.0,
-    },
-  },
 
   {
     name: 'Inner City Life',

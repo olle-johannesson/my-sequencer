@@ -255,8 +255,7 @@ body.audio-started:has(#audio-toggle:checked) #hold .icon-pause { opacity: 1; }
 .panel pre,
 .panel h3,
 .panel li a {
-    mix-blend-mode: difference;
-    color: white;
+    color: var(--fg);
 }
 
 details:open summary {
