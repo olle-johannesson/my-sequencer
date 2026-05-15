@@ -3,6 +3,7 @@
 // AudioContext via `setSinkId`. Mirrors the shape of `microphoneInput.js`.
 
 let currentDeviceId = null
+let onDeviceLost = null
 
 export function setOutputDeviceId(id) {
   currentDeviceId = id || null
@@ -11,6 +12,27 @@ export function setOutputDeviceId(id) {
 export function getOutputDeviceId() {
   return currentDeviceId
 }
+
+/**
+ * Register a callback to fire when the pinned output device disappears
+ * (Bluetooth headphones turn off, jack pulled, etc.). Fires at most once
+ * per device-loss event. Default-mode (no pinned device) never fires —
+ * the system handles rerouting in that case.
+ */
+export function setOnOutputDeviceLost(handler) {
+  onDeviceLost = handler
+}
+
+navigator.mediaDevices?.addEventListener?.('devicechange', async () => {
+  if (!currentDeviceId) return
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    const stillPresent = devices.some(d => d.kind === 'audiooutput' && d.deviceId === currentDeviceId)
+    if (!stillPresent) onDeviceLost?.()
+  } catch (e) {
+    console.warn('enumerateDevices failed during device-loss check', e)
+  }
+})
 
 /**
  * Is `AudioContext.setSinkId` available in this browser? Static check —

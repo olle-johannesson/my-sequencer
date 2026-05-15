@@ -43,3 +43,14 @@ export function showIsRecording() {
 export function resetIsRecording() {
   audioToggleLabel().classList.remove('recording');
 }
+
+/**
+ * Flip the toggle UI to the paused state without triggering its `change`
+ * handler. Used when the app pauses itself in response to something other
+ * than a user click — e.g. the selected output device disappeared.
+ */
+export function syncToggleToPaused() {
+  const toggle = audioToggle()
+  if (toggle) toggle.checked = false
+  audioToggleLabel()?.classList.remove(DISCO_CLASS)
+}

@@ -5,7 +5,7 @@ import {clearAllSamples, incrementPatternAge, samplePattern, scheduleAt as sampl
 import {getMicrophoneStream, setMicDeviceId, swapLiveMicTo} from "./audio/microphoneInput.js";
 import {populateInputSources, setupInputSourceSelect} from "./ui/inputSourceSelect.js";
 import {populateOutputSources, setupOutputSourceSelect} from "./ui/outputSourceSelect.js";
-import {applyOutputDevice, setOutputDeviceId} from "./audio/outputDevice.js";
+import {applyOutputDevice, setOnOutputDeviceLost, setOutputDeviceId} from "./audio/outputDevice.js";
 import {audioFeatureSAB, setupRecordingChain} from "./audio/recordingChain.js";
 import {setupInputMeter} from "./ui/inputMeter.js";
 import {setupSliders} from "./ui/sliders.js";
@@ -19,7 +19,7 @@ import {setDiagnostic} from "./ui/messages.js";
 import {startMainThreadMonitor} from "./dev/mainThreadMonitor.js";
 import {startLoop, stopLoop} from "./looper.js";
 import {cancelAllScheduled, playMonophonicSampleAt, playSampleAt} from "./audio/samplePlayer.js";
-import {attachEventListenersToAudioToggle, resetIsRecording, showIsRecording, showLoader} from "./ui/audioToggle.js";
+import {attachEventListenersToAudioToggle, resetIsRecording, showIsRecording, showLoader, syncToggleToPaused} from "./ui/audioToggle.js";
 import {spectrumSize} from "./config.js";
 import {video} from "./ui/uiHandles.js";
 import {getVideoUrl} from "./ui/loadvideo.js";
@@ -51,6 +51,15 @@ setupOutputSourceSelect(async (deviceId) => {
   setOutputDeviceId(deviceId)
   // Apply immediately if the audio chain is up; otherwise start() picks it up.
   if (audioContext) await applyOutputDevice(audioContext)
+})
+setOnOutputDeviceLost(() => {
+  // Pinned output went away (headphones turned off, jack pulled, etc.).
+  // Pause without touching pattern state — when the user presses play
+  // again we resume right where we were.
+  if (audioContext?.state === 'running') {
+    softStop()
+    syncToggleToPaused()
+  }
 })
 
 async function start() {
@@ -162,6 +171,7 @@ async function start() {
 }
 
 async function safeStop() {
+  wasSoftStopped = false
   try { stopLoop() } catch {}
   try { cancelAllScheduled() } catch {}
   if (recordingChain?.microphoneInputNode) {
@@ -188,6 +198,7 @@ async function safeStop() {
 }
 
 async function stop() {
+  wasSoftStopped = false
   stopLoop()
   cancelAllScheduled()
   if (recordingChain?.microphoneInputNode) {
