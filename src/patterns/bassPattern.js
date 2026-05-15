@@ -5,12 +5,13 @@ import {continuePattern} from "../magentaHelper.js"
 import {evenlySpacedPartitions} from "../util/evenlySpacedPartitions.js"
 import {DRUM_TO_PITCH} from "../drums/drumNameMaps.js"
 import {creepTemperature} from "./creep.js"
+import {binIndex} from "../util/bins.js";
 
 // Drum pitches whose onsets we treat as bass-pattern onsets. Kick is the
-// core (always); a touch of tom adds occasional accents without flooding
-// the bassline.
+// core; toms add occasional accents without flooding the bassline.
 const KICK_PITCH = DRUM_TO_PITCH.kick
-const TOM_PITCHES = new Set([
+const BASS_LIKE_DRUM_PITCHES = new Set([
+  KICK_PITCH,
   DRUM_TO_PITCH.tomLow,
   DRUM_TO_PITCH.tomMid,
   DRUM_TO_PITCH.tomHigh,
@@ -57,47 +58,37 @@ const STATE_RATE_INDICES = (() => {
   return indices
 })()
 
-// Walker state. markovState is the current scale degree (0..4);
-// lastBassRate is the actual rate we played, used to break octave ties
-// toward nearest-by-pitch motion. Reset by clearAllBass.
-let markovState = 0
-let lastBassRate = 1.0
-
-function pickMarkovRate() {
-  const row = markovTable[markovState]
-
-  // Sample the next state from the row's distribution. Fallback to the
-  // last index in case floating-point cumulative falls short of 1.
-  const r = Math.random()
-  let cumulative = 0
-  let nextState = row.length - 1
-  for (let i = 0; i < row.length; i++) {
-    cumulative += row[i]
-    if (r < cumulative) { nextState = i; break }
-  }
-
-  // Of all rates that produce this scale degree, pick the one closest in
-  // log-pitch to where we just were. Stops the line from leaping octaves
-  // every time it lands on a multi-octave degree.
-  const candidates = STATE_RATE_INDICES[nextState]
-  let bestIdx = candidates[0]
-  let bestDist = Math.abs(Math.log2(BASS_RATES[bestIdx] / lastBassRate))
-  for (let i = 1; i < candidates.length; i++) {
-    const dist = Math.abs(Math.log2(BASS_RATES[candidates[i]] / lastBassRate))
-    if (dist < bestDist) {
-      bestDist = dist
-      bestIdx = candidates[i]
-    }
-  }
-
-  markovState = nextState
-  lastBassRate = BASS_RATES[bestIdx]
-  return lastBassRate
+function pickMarkovRate(prevRate) {
+  const prevState = rateToState(prevRate)
+  const nextState = binIndex(markovTable[prevState], Math.random())
+  const candidateRates = STATE_RATE_INDICES[nextState].map(idx => BASS_RATES[idx])
+  return nearestInLogPitch(candidateRates, prevRate)
 }
 
-function resetMarkovWalker() {
-  markovState = 0
-  lastBassRate = 1.0
+// Inverse of the table-construction step: a rate maps back to its scale
+// degree index. Octave-fold to mod 12 so e.g. -7 semitones (low fifth)
+// and +5 semitones (high fourth — different rate, same degree as ±5)
+// land on their own state. Defensive fallback to root for any rate that
+// isn't on the pentatonic grid.
+function rateToState(rate) {
+  const semitones = Math.round(12 * Math.log2(rate))
+  const degreeSemitones = ((semitones % 12) + 12) % 12
+  const state = MINOR_PENTATONIC.indexOf(degreeSemitones)
+  return state === -1 ? 0 : state
+}
+
+// A scale degree may live at more than one octave within BASS_RATES — e.g.
+// "4" appears at both -7 and +5 semitones from the root. When the Markov
+// walker lands on such a degree, pick whichever octave is closest to the
+// previously played rate, measured in log-pitch (so octave distance is
+// constant regardless of where on the scale we are). Keeps the line
+// walking smoothly instead of leaping every time it crosses a multi-
+// octave note.
+const logDistance = (a, b) => Math.abs(Math.log2(a / b))
+function nearestInLogPitch(rates, fromRate) {
+  return rates.reduce((a, b) =>
+    logDistance(a, fromRate) <= logDistance(b, fromRate) ? a : b
+  )
 }
 
 // Single bass voice — basslines are monophonic, and overlap is handled by
@@ -110,6 +101,11 @@ let currentBassBuffer = null
 const scheduledBass = new Array(16).fill(null)
 export {scheduledBass as bassPattern}
 
+// Pre-computed bass pattern, ready to promote on the next regen tick.
+// Same buffering trick `updateDrumPattern` uses: promote synchronously,
+// then start the next magenta call. Keeps the bar boundary unblocked.
+let nextBassPattern = null
+
 /**
  * Pick a random bass sample, decode it, and stash it as the current voice.
  * Called from main.js#start, parallel to initDrumPattern.
@@ -121,94 +117,138 @@ export async function initBassPattern(audioContext) {
 }
 
 /**
- * Regenerate the bass pattern from a fresh set of onsets (typically the
- * kick onsets from the latest magenta drum continuation).
- *
- * **Diff-based pitch update.** Onsets that persisted from the previous
- * pattern keep their previously-assigned playbackRate. Only newly appearing
- * onsets get a freshly-picked rate from `pickPitch`. This is what makes the
- * bassline evolve gradually instead of resetting on every regen — the
- * "main notes" of the line stay anchored while the periphery breathes.
- *
- * `pickPitch` is the single swap point for the pitch-selection strategy:
- *   - default: uniform random over the pentatonic ladder
- *   - later: weighted toward root / fifth
- *   - eventually: Markov chain over scale degrees
- *
- * @param {Iterable<number>} newOnsets — step indices [0..15] where bass should hit
- * @param {() => number} [pickPitch] — returns a playbackRate
- */
-export function regenerateBassPattern(newOnsets, pickPitch = pickRandomRate) {
-  if (!currentBassBuffer) return
-
-  const previous = [...scheduledBass]
-  for (let i = 0; i < scheduledBass.length; i++) scheduledBass[i] = null
-
-  for (const step of newOnsets) {
-    scheduledBass[step] = previous[step] ?? {
-      buffer: currentBassBuffer,
-      playbackRate: pickPitch(),
-    }
-  }
-}
-
-/**
- * Reset both the schedule and the loaded bass buffer. Called from stop().
- * `initBassPattern` will pick a fresh buffer on the next start.
+ * Reset the schedule, the buffered next pattern, and the loaded bass
+ * buffer. Called from stop(). `initBassPattern` will pick a fresh buffer
+ * on the next start.
  */
 export function clearAllBass() {
   for (let i = 0; i < scheduledBass.length; i++) scheduledBass[i] = null
+  nextBassPattern = null
   currentBassBuffer = null
-  resetMarkovWalker()
-}
-
-function pickRandomRate() {
-  return BASS_RATES[Math.floor(Math.random() * BASS_RATES.length)]
 }
 
 /**
- * Seed magenta with the current drum continuation plus a couple of ghost
- * kicks, then extract kick + tom onsets from the result. Same ghost-pitch
- * trick patternMutation uses for sample placement — just aimed at the
- * bass-drum slot.
+ * Continue a drum pattern through magenta, but inject a few evenly-spaced
+ * ghost kicks into the seed first so the continuation tends to elaborate
+ * on kick activity. Same ghost-pitch trick patternMutation uses for sample
+ * placement, aimed at the bass-drum slot here.
  *
- * @param {INoteSequence} currentDrumPattern
- * @returns {Promise<number[]>} step indices [0..15], sorted ascending
+ * @param {INoteSequence} seedDrumPattern
+ * @returns {Promise<INoteSequence>}
  */
-async function computeBassOnsets(currentDrumPattern) {
-  const ghostSteps = evenlySpacedPartitions(GHOST_KICK_COUNT, 16)
-  const ghostNotes = ghostSteps.map(stepIndex => ({
+async function continueDrumPatternWithGhostKicks(seedDrumPattern) {
+  const ghostNotes = evenlySpacedPartitions(GHOST_KICK_COUNT, 16).map(step => ({
     pitch: KICK_PITCH,
-    startTime: stepIndex / 16.0,
-    endTime: Math.min(stepIndex / 16 + 0.5, 1.0),
-    quantizedStartStep: stepIndex,
-    quantizedEndStep: stepIndex + 1,
+    startTime: step / 16.0,
+    endTime: Math.min(step / 16 + 0.5, 1.0),
+    quantizedStartStep: step,
+    quantizedEndStep: step + 1,
   }))
-  const seed = {
-    ...currentDrumPattern,
-    notes: [...currentDrumPattern.notes, ...ghostNotes],
-  }
+  return continuePattern({
+    ...seedDrumPattern,
+    notes: [...seedDrumPattern.notes, ...ghostNotes],
+  }, creepTemperature())
+}
 
-  const continuation = await continuePattern(seed, creepTemperature())
-
+/**
+ * Step indices in `drumPattern` where any of `pitches` plays. Sorted
+ * ascending, deduplicated.
+ *
+ * @param {INoteSequence} drumPattern
+ * @param {Set<number>} pitches
+ * @returns {number[]}
+ */
+function extractOnsets(drumPattern, pitches) {
   const onsets = new Set()
-  for (const note of continuation.notes) {
-    if (note.pitch === KICK_PITCH || TOM_PITCHES.has(note.pitch)) {
-      onsets.add(note.quantizedStartStep)
-    }
+  for (const note of drumPattern.notes) {
+    if (pitches.has(note.pitch)) onsets.add(note.quantizedStartStep)
   }
   return [...onsets].sort((a, b) => a - b)
 }
 
 /**
- * One-shot bass-pattern update: pull onsets via magenta + ghost-kick seed,
- * then fold them into the schedule with diff-based pitch retention.
- * Call from main.js#beforeEachCycle on the desired cadence (e.g. every 4
- * bars). Caller passes the current drum pattern from
- * `drumPattern.getCurrentPattern()`.
+ * Decide the bass note for `step`, given the previous bass pattern and
+ * the rate that's playing just before this position in the new line.
+ *
+ * Persistence: if the seed already had a bass note at this step, reuse
+ * it verbatim — pitch and buffer carry over. This is what keeps the
+ * bassline coherent across regens; only the freshly appearing onsets
+ * get new pitches rolled.
+ *
+ * @param {number} step
+ * @param {Array<{buffer: AudioBuffer, playbackRate: number} | null>} seedBassPattern
+ * @param {number} prevRate — rate of the most recent placed bass note
  */
-export async function updateBassPattern(currentDrumPattern, pickPitch = pickMarkovRate) {
-  if (!currentDrumPattern) return
-  const onsets = await computeBassOnsets(currentDrumPattern)
-  regenerateBassPattern(onsets, pickPitch)
+function pitchOnsetWithContext(step, seedBassPattern, prevRate) {
+  return seedBassPattern[step] ?? {
+    buffer: currentBassBuffer,
+    playbackRate: pickMarkovRate(prevRate),
+  }
+}
+
+// The bass note playing right before the bar boundary (wraparound from
+// the seed pattern's tail). Used as the starting prevRate for the new
+// regen so the Markov walker sees genuine line continuity instead of
+// resetting to root every 4 bars.
+function lastPlayedRate(pattern) {
+  for (let i = pattern.length - 1; i >= 0; i--) {
+    if (pattern[i]) return pattern[i].playbackRate
+  }
+  return 1.0
+}
+
+/**
+ * Compute one bass-pattern regen as pure-ish data.
+ *
+ *   1. Continue the drum pattern (with kick bias) — gives us a fresh
+ *      INoteSequence of where things might hit.
+ *   2. Extract the onsets at bass-like drum pitches.
+ *   3. For each onset, decide its pitch in the context of the seed
+ *      bass pattern (persistent onsets keep their pitch, new ones roll).
+ *
+ * Doesn't mutate module state apart from advancing the Markov walker
+ * inside `pitchOnsetWithContext`. Returns the new pattern as a plain
+ * array.
+ *
+ * @param {INoteSequence} seedDrumPattern
+ * @param {Array<{buffer: AudioBuffer, playbackRate: number} | null>} seedBassPattern
+ * @returns {Promise<Array<{buffer: AudioBuffer, playbackRate: number} | null>>}
+ */
+async function computeNextBassPattern(seedDrumPattern, seedBassPattern) {
+  const drumContinuation = await continueDrumPatternWithGhostKicks(seedDrumPattern)
+  const onsets = extractOnsets(drumContinuation, BASS_LIKE_DRUM_PITCHES)
+  const next = new Array(16).fill(null)
+  let prevRate = lastPlayedRate(seedBassPattern)
+  for (const step of onsets) {
+    next[step] = pitchOnsetWithContext(step, seedBassPattern, prevRate)
+    prevRate = next[step].playbackRate
+  }
+  return next
+}
+
+/**
+ * Promote the previously-computed pattern to the live schedule, then
+ * pre-compute the *next* one for the following regen.
+ *
+ * The promotion is synchronous so the new pattern is visible to the
+ * looper before the magenta call starts. The `await` lands as the last
+ * statement, so this function returns control to `beforeEachCycle` only
+ * after the bar boundary has been crossed — magenta inference can take
+ * its time without delaying the bar.
+ *
+ * On the very first call there's no buffered pattern yet, so we compute
+ * one inline. Subsequent calls take the buffered one for free.
+ *
+ * @param {INoteSequence} seedDrumPattern
+ */
+export async function updateBassPattern(seedDrumPattern) {
+  if (!seedDrumPattern || !currentBassBuffer) return
+
+  if (!nextBassPattern) {
+    nextBassPattern = await computeNextBassPattern(seedDrumPattern, scheduledBass)
+  }
+
+  for (let i = 0; i < scheduledBass.length; i++) scheduledBass[i] = nextBassPattern[i]
+
+  nextBassPattern = await computeNextBassPattern(seedDrumPattern, scheduledBass)
 }
