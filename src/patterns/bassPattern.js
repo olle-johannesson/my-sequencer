@@ -1,6 +1,6 @@
 import {loadSample} from "../drums/loadSample.js"
 import {bassSamples} from "../drums/bass.js"
-import {pentatonicRates} from "../dsp/pentatonic.js"
+import {MINOR_PENTATONIC, pentatonicRates} from "../dsp/pentatonic.js"
 import {continuePattern} from "../magentaHelper.js"
 import {evenlySpacedPartitions} from "../util/evenlySpacedPartitions.js"
 import {DRUM_TO_PITCH} from "../drums/drumNameMaps.js"
@@ -26,6 +26,79 @@ const GHOST_KICK_COUNT = 2
 // The bassline is a fixed 16-step pattern (regenerated every few bars),
 // not a continuous random walk.
 const BASS_RATES = pentatonicRates({semitonesDown: 7, semitonesUp: 7})
+
+// states:
+// 0 = 1
+// 1 = ♭3
+// 2 = 4
+// 3 = 5
+// 4 = ♭7
+
+const markovTable = [
+  [0.20, 0.15, 0.10, 0.35, 0.20], // from 1
+  [0.30, 0.10, 0.25, 0.25, 0.10], // from ♭3
+  [0.25, 0.15, 0.10, 0.35, 0.15], // from 4
+  [0.40, 0.10, 0.15, 0.15, 0.20], // from 5
+  [0.35, 0.20, 0.10, 0.25, 0.10]  // from ♭7
+];
+
+// For each Markov state (0..4) — the list of indices into BASS_RATES that
+// produce that scale degree. Some degrees appear at multiple octaves
+// within the ±7-semitone range (e.g. "4" sits at both -7 and +5); states
+// like the root only appear once. Computed once at module load.
+const STATE_RATE_INDICES = (() => {
+  const indices = MINOR_PENTATONIC.map(() => [])
+  BASS_RATES.forEach((rate, idx) => {
+    const semitones = Math.round(12 * Math.log2(rate))
+    const degreeSemitones = ((semitones % 12) + 12) % 12
+    const state = MINOR_PENTATONIC.indexOf(degreeSemitones)
+    if (state !== -1) indices[state].push(idx)
+  })
+  return indices
+})()
+
+// Walker state. markovState is the current scale degree (0..4);
+// lastBassRate is the actual rate we played, used to break octave ties
+// toward nearest-by-pitch motion. Reset by clearAllBass.
+let markovState = 0
+let lastBassRate = 1.0
+
+function pickMarkovRate() {
+  const row = markovTable[markovState]
+
+  // Sample the next state from the row's distribution. Fallback to the
+  // last index in case floating-point cumulative falls short of 1.
+  const r = Math.random()
+  let cumulative = 0
+  let nextState = row.length - 1
+  for (let i = 0; i < row.length; i++) {
+    cumulative += row[i]
+    if (r < cumulative) { nextState = i; break }
+  }
+
+  // Of all rates that produce this scale degree, pick the one closest in
+  // log-pitch to where we just were. Stops the line from leaping octaves
+  // every time it lands on a multi-octave degree.
+  const candidates = STATE_RATE_INDICES[nextState]
+  let bestIdx = candidates[0]
+  let bestDist = Math.abs(Math.log2(BASS_RATES[bestIdx] / lastBassRate))
+  for (let i = 1; i < candidates.length; i++) {
+    const dist = Math.abs(Math.log2(BASS_RATES[candidates[i]] / lastBassRate))
+    if (dist < bestDist) {
+      bestDist = dist
+      bestIdx = candidates[i]
+    }
+  }
+
+  markovState = nextState
+  lastBassRate = BASS_RATES[bestIdx]
+  return lastBassRate
+}
+
+function resetMarkovWalker() {
+  markovState = 0
+  lastBassRate = 1.0
+}
 
 // Single bass voice — basslines are monophonic, and overlap is handled by
 // playMonophonicSampleAt interrupting itself when the buffer reuses.
@@ -86,6 +159,7 @@ export function regenerateBassPattern(newOnsets, pickPitch = pickRandomRate) {
 export function clearAllBass() {
   for (let i = 0; i < scheduledBass.length; i++) scheduledBass[i] = null
   currentBassBuffer = null
+  resetMarkovWalker()
 }
 
 function pickRandomRate() {
@@ -133,7 +207,7 @@ async function computeBassOnsets(currentDrumPattern) {
  * bars). Caller passes the current drum pattern from
  * `drumPattern.getCurrentPattern()`.
  */
-export async function updateBassPattern(currentDrumPattern, pickPitch = pickRandomRate) {
+export async function updateBassPattern(currentDrumPattern, pickPitch = pickMarkovRate) {
   if (!currentDrumPattern) return
   const onsets = await computeBassOnsets(currentDrumPattern)
   regenerateBassPattern(onsets, pickPitch)
