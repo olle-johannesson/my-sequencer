@@ -11,6 +11,7 @@ export const controlsPanel     = () => document.getElementById('controls');
 export const inputSourceSelect = () => document.getElementById('input-source');
 export const inputSourceLabel  = () => document.querySelector('label[for="input-source"]');
 export const inputSourceNote   = () => document.getElementById('input-source-note');
+export const outputSourceSelect = () => document.getElementById('output-source');
 export const inputMeter        = () => document.getElementById('input-meter');
 export const sensitivityGauge  = () => document.getElementById('sensitivity-gauge');
 export const filterGauge       = () => document.getElementById('filter-gauge');

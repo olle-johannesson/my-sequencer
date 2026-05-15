@@ -4,6 +4,8 @@ import {addNewRecordedSample, clearMutationState, maybeReshuffle} from "./patter
 import {clearAllSamples, incrementPatternAge, samplePattern, scheduleAt as samplePatternScheduleAt} from "./patterns/samplePattern.js";
 import {getMicrophoneStream, setMicDeviceId, swapLiveMicTo} from "./audio/microphoneInput.js";
 import {populateInputSources, setupInputSourceSelect} from "./ui/inputSourceSelect.js";
+import {populateOutputSources, setupOutputSourceSelect} from "./ui/outputSourceSelect.js";
+import {applyOutputDevice, setOutputDeviceId} from "./audio/outputDevice.js";
 import {audioFeatureSAB, setupRecordingChain} from "./audio/recordingChain.js";
 import {setupInputMeter} from "./ui/inputMeter.js";
 import {setupSliders} from "./ui/sliders.js";
@@ -40,6 +42,11 @@ setupInputSourceSelect(async (deviceId) => {
   if (audioContext && recordingChain) {
     microphoneStream = await swapLiveMicTo(audioContext, microphoneStream, recordingChain, deviceId)
   }
+})
+setupOutputSourceSelect(async (deviceId) => {
+  setOutputDeviceId(deviceId)
+  // Apply immediately if the audio chain is up; otherwise start() picks it up.
+  if (audioContext) await applyOutputDevice(audioContext)
 })
 
 async function start() {
@@ -83,7 +90,13 @@ async function start() {
         })
 
       populateInputSources()
+      populateOutputSources()
     }
+
+    // Route audio to the user's chosen output device (if any, and if the
+    // browser supports setSinkId). On resume this re-asserts the choice in
+    // case the device list shifted while we were paused.
+    await applyOutputDevice(audioContext)
 
     // 2. Initial patterns. Drum init + bass-sample load can run in parallel;
     // the bass *pattern* itself seeds from the drum continuation, so it
