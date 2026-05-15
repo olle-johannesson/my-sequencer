@@ -19,7 +19,7 @@ export function classify(samples, sampleRate, Meyda) {
 
   // Multi-window features. Computed once per recording so the cost is small
   // and only paid on samples that survived the recording gate.
-  const sustained = sustainedScore(samples, sampleRate)
+  const sustained = sustainedScore(samples, sampleRate, Meyda)
   const {pitchHz, pitchStability} = detectPitch(samples, sampleRate)
 
   const features = {

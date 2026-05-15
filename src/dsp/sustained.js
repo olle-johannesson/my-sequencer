@@ -1,52 +1,66 @@
-// 20 ms windows give us a reasonable energy snapshot without being so fine
-// that natural amplitude wobble (vibrato, breath, room) drags the score down.
-const WINDOW_MS = 20
+// 2048 samples ≈ 46 ms at 44.1k — same scale as the YIN windows in
+// pitch.js. Power-of-two so Meyda's internal FFT is happy.
+const WINDOW_SIZE = 2048
 
-// Windows whose RMS exceeds this fraction of the peak RMS count as "loud".
-// 0.3 = roughly -10 dB below peak. Quiet enough to include the body of a
-// held note, loud enough to exclude the decay tail.
-const LOUD_THRESHOLD = 0.3
-
-// Below this many windows the sample is too short to meaningfully be called
-// sustained. 4 × 20 ms = 80 ms — a drum hit plus its decay tail.
-const MIN_WINDOWS = 4
+// Number of windows to sample across the body. More = tighter estimate
+// at proportional FFT cost. 5 matches the resolution we use for pitch
+// stability and keeps the per-recording extraction cheap.
+const FLATNESS_WINDOWS = 5
 
 /**
- * Score how "sustained" a sample is, 0..1.
+ * "Is this a tonal sound (a pitched / sustained tone) or a noisy /
+ * percussive one?" — orthogonal to pitchStability, which measures how
+ * much that pitch wanders over time.
  *
- * Splits the sample into ~20 ms windows, computes per-window RMS, and reports
- * the fraction of windows whose RMS is within `LOUD_THRESHOLD` of the peak.
- * A drum hit (loud transient, fast decay) scores low; a held note (loud
- * throughout) scores high.
+ * Computes spectral flatness over windows from the inner 15–85% of the
+ * buffer, then returns `1 - mean(flatness)`. Low flatness means the
+ * spectrum is peaky (a few strong partials — what a tone looks like).
+ * High flatness means white-noise-like (energy spread evenly — what a
+ * snare or breath or hiss looks like).
  *
- * Independent of pitchedness — a sustained noise drone scores high too. The
- * caller combines this with pitch / flatness to decide what musical role the
- * sample should play.
+ * Attack transients are skipped because even pure tones have noisy
+ * onsets; what we care about is what the body of the sound looks like.
+ *
+ *   clean whistle  → ~0.95
+ *   sung note      → ~0.85
+ *   bowed string   → ~0.85
+ *   tom hit        → ~0.50  (some periodic content + a lot of noise)
+ *   snare          → ~0.20
+ *   hihat / hiss   → ~0.05
+ *
+ * @param {Float32Array} samples
+ * @param {number} sampleRate
+ * @param {object} Meyda
+ * @returns {number} 0..1; 1 = pure tone, 0 = white noise
  */
-export function sustainedScore(samples, sampleRate) {
-  const windowSize = Math.floor(sampleRate * WINDOW_MS / 1000)
-  const windowCount = Math.floor(samples.length / windowSize)
-  if (windowCount < MIN_WINDOWS) return 0
+export function sustainedScore(samples, sampleRate, Meyda) {
+  if (samples.length < WINDOW_SIZE) return 0
 
-  // Per-window RMS, plus the peak across windows.
-  let peakRms = 0
-  const rms = new Float32Array(windowCount)
-  for (let i = 0; i < windowCount; i++) {
-    const start = i * windowSize
-    let sum = 0
-    for (let j = 0; j < windowSize; j++) {
-      const s = samples[start + j]
-      sum += s * s
-    }
-    const r = Math.sqrt(sum / windowSize)
-    rms[i] = r
-    if (r > peakRms) peakRms = r
+  const innerStart = Math.floor(samples.length * 0.15)
+  const innerEnd   = Math.floor(samples.length * 0.85) - WINDOW_SIZE
+
+  // Buffer too short to take multiple windows from the body — fall back
+  // to a single window from the start. Less reliable but better than 0.
+  if (innerEnd <= innerStart) {
+    const flatness = extractFlatness(Meyda, samples.subarray(0, WINDOW_SIZE))
+    return flatness == null ? 0 : Math.max(0, 1 - flatness)
   }
-  if (peakRms === 0) return 0
 
-  const threshold = peakRms * LOUD_THRESHOLD
-  let above = 0
-  for (let i = 0; i < windowCount; i++) if (rms[i] > threshold) above++
+  let sum = 0
+  let count = 0
+  for (let i = 0; i < FLATNESS_WINDOWS; i++) {
+    const offset = innerStart + Math.floor((innerEnd - innerStart) * i / (FLATNESS_WINDOWS - 1))
+    const flatness = extractFlatness(Meyda, samples.subarray(offset, offset + WINDOW_SIZE))
+    if (flatness != null) {
+      sum += flatness
+      count++
+    }
+  }
+  if (count === 0) return 0
+  return Math.max(0, 1 - sum / count)
+}
 
-  return above / windowCount
+function extractFlatness(Meyda, window) {
+  const r = Meyda.extract(['spectralFlatness'], window)
+  return Number.isFinite(r?.spectralFlatness) ? r.spectralFlatness : null
 }
